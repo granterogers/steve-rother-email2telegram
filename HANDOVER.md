@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 8 deployed and visually verified on 25 October 2026; access restricted to the owner |
+| Private dashboard | Version 8 deployed; faithful-email-rendering release prepared and locally verified on 25 October 2026 |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -26,6 +26,8 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Scheduled trigger | Off at last verified state |
 
 Version 8 makes testing the primary screen; explains why live mode and scheduling are safely off; moves uncommon configuration and secrets into collapsible sections; expands Telegram destination metadata and bot permissions; compares the tracking-cleaned original with the Telegram result side by side; and allows text edits plus image reordering/removal before a test send. Edited previews retain server-side signature protection.
+
+The next release replaces the source-side text reconstruction with a sandboxed rendering of the actual Gmail HTML. It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing tracking pixels, scripts and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body.
 
 ## Resources
 
