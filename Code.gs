@@ -62,6 +62,12 @@ function getDashboardState() {
       destinationConfigured: Boolean(props.getProperty(PROP.telegramChatId)),
       liveMode: props.getProperty(PROP.liveMode) === 'true',
       triggerInstalled: ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'scheduledRun'),
+      liveReason: props.getProperty(PROP.liveMode) === 'true'
+        ? 'Enabled for approved production publishing.'
+        : 'Safely off until a preview is approved for the first controlled live publication.',
+      scheduleReason: ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'scheduledRun')
+        ? 'Cloud trigger installed and running automatically.'
+        : 'Not installed yet. It stays off until the controlled live test and duplicate check pass.',
       lastTestAt: last ? last.testedAt : '',
       lastTestSubject: last ? last.subject : ''
     },
@@ -168,6 +174,26 @@ function sendDashboardTestPreview(input) {
   const items = buildFallbackPublicationItems_(result.proposedPost, images, getSettings_().maxTelegramChars, links);
   const messageIds = items.map(item => (item.type === 'photo' ? telegramSendPhoto_(item.url, destination) : telegramSend_(item.text, destination)).message_id);
   return { sent: true, mode: 'ordered_sequence', messageIds: messageIds, gmailModified: false, destination: destinationInfo };
+}
+
+function prepareEditedDashboardPreview(input) {
+  input = input || {};
+  const original = input.original || {};
+  if (String(input.originalSignature || '') !== signTestPreview_(original)) {
+    throw new Error('The original preview signature is invalid. Generate the preview again.');
+  }
+  const edited = {
+    messageId: String(original.messageId || ''),
+    proposedPost: String(input.proposedPost || '').trim(),
+    images: Array.isArray(input.images) ? input.images : [],
+    links: Array.isArray(original.links) ? original.links : []
+  };
+  if (!edited.proposedPost) throw new Error('The edited Telegram post cannot be empty.');
+  if (edited.proposedPost.length > getSettings_().maxTelegramChars) {
+    throw new Error('The edited post exceeds the configured Telegram character limit.');
+  }
+  edited.previewSignature = signTestPreview_(edited);
+  return edited;
 }
 
 function signTestPreview_(result) {
@@ -494,7 +520,8 @@ function rewriteWithGemini_(extracted) {
   const linkInstruction = extracted.links.length
     ? '\n\nLINK RULES:\nThe cleaned source contains protected markers such as [[LINK_1]]. Preserve every link marker exactly once, unchanged, immediately after the words it belongs to. Never invent, edit, shorten, or replace a link marker.'
     : '';
-  const prompt = settings.rewritePrompt + imageInstruction + linkInstruction + '\n\nNEWSLETTER SUBJECT:\n' + extracted.subject + '\n\nCLEANED SOURCE:\n' + extracted.text;
+  const formatInstruction = '\n\nREADABILITY RULES:\nUse short, naturally spaced paragraphs. Use simple bullet points for lists of dates, events, benefits, or actions. Leave a blank line between sections. Avoid dense text walls and unnecessary headings.';
+  const prompt = settings.rewritePrompt + formatInstruction + imageInstruction + linkInstruction + '\n\nNEWSLETTER SUBJECT:\n' + extracted.subject + '\n\nCLEANED SOURCE:\n' + extracted.text;
   const payload = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
@@ -739,7 +766,41 @@ function telegramGetChat_(chatIdOverride) {
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getChat?chat_id=' + encodeURIComponent(chatId), { muteHttpExceptions: true });
   const data = JSON.parse(response.getContentText());
   if (!data.ok) throw new Error('Telegram destination validation failed.');
-  return { id: data.result.id, type: data.result.type, title: data.result.title || data.result.username || '' };
+  const chat = data.result || {};
+  const info = {
+    id: chat.id,
+    type: chat.type,
+    title: chat.title || chat.username || '',
+    username: chat.username ? '@' + chat.username : '',
+    description: chat.description || '',
+    inviteLink: chat.invite_link || '',
+    protectedContent: Boolean(chat.has_protected_content),
+    slowModeSeconds: chat.slow_mode_delay || 0,
+    memberCount: null,
+    botStatus: '',
+    canPostMessages: null,
+    canEditMessages: null,
+    canDeleteMessages: null,
+    canInviteUsers: null
+  };
+  try {
+    const countResponse = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getChatMemberCount?chat_id=' + encodeURIComponent(chatId), { muteHttpExceptions: true });
+    const countData = parseJson_(countResponse.getContentText()) || {};
+    if (countData.ok) info.memberCount = countData.result;
+  } catch (_) {}
+  try {
+    const bot = telegramGetMe_();
+    const memberResponse = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getChatMember?chat_id=' + encodeURIComponent(chatId) + '&user_id=' + encodeURIComponent(bot.id), { muteHttpExceptions: true });
+    const memberData = parseJson_(memberResponse.getContentText()) || {};
+    if (memberData.ok && memberData.result) {
+      info.botStatus = memberData.result.status || '';
+      ['can_post_messages', 'can_edit_messages', 'can_delete_messages', 'can_invite_users'].forEach(key => {
+        const mapped = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        info[mapped] = memberData.result[key] === undefined ? null : Boolean(memberData.result[key]);
+      });
+    }
+  } catch (_) {}
+  return info;
 }
 
 function fetchWithRetry_(url, options, serviceName) {
