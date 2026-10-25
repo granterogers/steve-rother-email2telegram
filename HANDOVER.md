@@ -18,7 +18,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Telegram bot | `@steve_newsletter_bot` |
 | Telegram destination | Test group configured in Script Properties; numeric ID deliberately excluded from this public repository |
 | Gemini | API key configured in Script Properties; value excluded from the repository |
-| Historical dry run | Previously succeeded with six selected images; must be rerun after the link-preservation release |
+| Historical dry run | Version 9 dry run succeeded in 6 seconds with 8 images and 12 useful labelled links |
 | Test Telegram publication | Not yet performed for the current rich-message/link build |
 | Controlled live publication | Not yet performed |
 | Duplicate-prevention live check | Not yet performed |
@@ -150,8 +150,8 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 
 ## Known remaining work
 
-- Test **Scan my inbox** and generate previews for one and several newsletters. The Version 9 controls are deployed, but no inbox scan or Gemini generation was run during this release verification.
-- Verify the faithful original-email rendering and rich Telegram preview visually after generating a preview.
+- Test one or several additional newsletters if desired. The Version 9 Inbox scan and Gemini generation were verified against the 24 October sample.
+- The faithful original-email rendering and editable rich Telegram preview were visually verified side by side for that sample.
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
 - Verify duplicate prevention with a second run.
