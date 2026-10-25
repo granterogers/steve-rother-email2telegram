@@ -13,6 +13,7 @@ const CONFIG = Object.freeze({
   maxSourceChars: 30000,
   maxTelegramChars: 3800,
   maxNewsletterImages: 8,
+  maxNewsletterLinks: 30,
   triggerEveryMinutes: 60,
   maxRetries: 3,
   rewritePrompt: [
@@ -404,7 +405,7 @@ function extractNewsletter_(message) {
   const settings = getSettings_();
   const html = String(message.getBody() || '');
   const plain = String(message.getPlainBody() || '');
-  const imageAware = html ? htmlToImageAwareText_(html, settings.maxNewsletterImages) : { text: '', images: [], links: [] };
+  const imageAware = html ? htmlToImageAwareText_(html, settings.maxNewsletterImages, settings.maxNewsletterLinks) : { text: '', images: [], links: [] };
   let text = html ? imageAware.text : cleanPlainText_(plain);
   if (text.length < 250 && plain) text = cleanPlainText_(plain);
   text = applyCustomParsing_(text, settings);
@@ -432,9 +433,10 @@ function extractNewsletter_(message) {
   };
 }
 
-function htmlToImageAwareText_(html, maxImages) {
+function htmlToImageAwareText_(html, maxImages, maxLinks) {
   const images = [];
   const links = [];
+  const linkLimit = Number(maxLinks || CONFIG.maxNewsletterLinks || 30);
   const seen = {};
   const seenLinks = {};
   let s = String(html || '');
@@ -458,7 +460,7 @@ function htmlToImageAwareText_(html, maxImages) {
       const cleanLabel = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
       const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
-      if (links.length >= 12 || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
+      if (links.length >= linkLimit || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
       if (!decodedUrl || seenLinks[decodedUrl]) return preservedContent;
       seenLinks[decodedUrl] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
@@ -974,6 +976,7 @@ function sanitizeSettings_(input) {
     minimumSourceChars: clamp_(Number(input.minimumSourceChars), 100, 5000, 250),
     maxTelegramChars: clamp_(Number(input.maxTelegramChars), 1000, 4000, defaults.maxTelegramChars),
     maxNewsletterImages: clamp_(Number(input.maxNewsletterImages), 1, 10, defaults.maxNewsletterImages),
+    maxNewsletterLinks: clamp_(Number(input.maxNewsletterLinks), 1, 50, defaults.maxNewsletterLinks),
     triggerEveryMinutes: triggerMinutes,
     maxRetries: clamp_(Number(input.maxRetries), 1, 5, defaults.maxRetries),
     rewritePrompt: String(input.rewritePrompt || defaults.rewritePrompt).trim(),
