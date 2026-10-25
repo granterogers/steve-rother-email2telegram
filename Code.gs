@@ -898,3 +898,90 @@ function sanitizeOriginalEmailPreview_(html) {
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<(?:script|iframe|object|embed|form|button)\b[\s\S]*?<\/(?:script|iframe|object|embed|form|button)>/gi, '')
     .replace(/<(?:script|iframe|object|embed|form|input|button)\b[^>]*\/?>/gi, '')
+    .replace(/<meta\b[^>]*http-equiv=["']?refresh["']?[^>]*>/gi, '')
+    .replace(/@import\s+url\([^)]*\)\s*;?/gi, '')
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/<img\b[^>]*(?:class=["'][^"']*open_img[^"']*["']|width=["']?1["']?[^>]*height=["']?1["']?|height=["']?0["']?)[^>]*>/gi, '')
+    .replace(/\s+href\s*=\s*(?:"[^"]*"|'[^']*')/gi, ' href="#"')
+    .replace(/\s+target\s*=\s*(?:"[^"]*"|'[^']*')/gi, '');
+  const guard = '<style>html,body{margin:0!important;padding:0!important;background:#fff!important;overflow-x:auto}a{cursor:default!important}img{max-width:100%;height:auto}body{pointer-events:none}</style>';
+  return value.replace(/<head[^>]*>/i, '$&' + guard);
+}
+function stripTrackingUrlsFromPost_(post) {
+  return String(post || '').replace(/https?:\/\/[^\s<>()]+/gi, function(url) {
+    return isTrackingUrl_(url.replace(/[.,;:!?]+$/, '')) ? '' : url;
+  }).replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+function escapeHtml_(value) { return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
+function escapeRegex_(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function parseJson_(value) { try { return value ? JSON.parse(value) : null; } catch (_) { return null; } }
+function digest_(value) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value)).replace(/=+$/, ''); }
+
+function decodeHtmlEntities_(value) {
+  const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  return String(value || '').replace(/&(#x?[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/gi, function(_, entity) {
+    if (entity.charAt(0) === '#') {
+      const hex = entity.charAt(1).toLowerCase() === 'x';
+      const code = parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
+      return isFinite(code) ? String.fromCharCode(code) : _;
+    }
+    return named[entity.toLowerCase()] || _;
+  });
+}
+
+function getSettings_() {
+  const saved = parseJson_(PropertiesService.getScriptProperties().getProperty('UI_CONFIG')) || {};
+  return sanitizeSettings_(Object.assign({}, CONFIG, saved));
+}
+
+function sanitizeSettings_(input) {
+  const defaults = CONFIG;
+  const sender = String(input.sender || defaults.sender).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender)) throw new Error('Newsletter sender must be a valid email address.');
+  const triggerMinutes = [15, 30, 60].includes(Number(input.triggerEveryMinutes)) ? Number(input.triggerEveryMinutes) : 60;
+  return {
+    sender: sender,
+    processedLabel: String(input.processedLabel || defaults.processedLabel).trim(),
+    errorLabel: String(input.errorLabel || defaults.errorLabel).trim(),
+    gmailQuery: String(input.gmailQuery || ('from:' + sender + ' newer_than:180d -in:spam -in:trash')).trim(),
+    model: String(input.model || defaults.model).trim(),
+    maxSourceChars: clamp_(Number(input.maxSourceChars), 2000, 50000, defaults.maxSourceChars),
+    minimumSourceChars: clamp_(Number(input.minimumSourceChars), 100, 5000, 250),
+    maxTelegramChars: clamp_(Number(input.maxTelegramChars), 1000, 4000, defaults.maxTelegramChars),
+    maxNewsletterImages: clamp_(Number(input.maxNewsletterImages), 1, 10, defaults.maxNewsletterImages),
+    triggerEveryMinutes: triggerMinutes,
+    maxRetries: clamp_(Number(input.maxRetries), 1, 5, defaults.maxRetries),
+    rewritePrompt: String(input.rewritePrompt || defaults.rewritePrompt).trim(),
+    stripBefore: String(input.stripBefore || '').trim(),
+    stripAfter: String(input.stripAfter || '').trim(),
+    removePatterns: String(input.removePatterns || '').trim(),
+    postPrefix: String(input.postPrefix || '').trim(),
+    postSuffix: String(input.postSuffix || '').trim(),
+    testMessageId: String(input.testMessageId || PropertiesService.getScriptProperties().getProperty(PROP.testMessageId) || defaults.testMessageId).trim(),
+    telegramChatId: String(input.telegramChatId || PropertiesService.getScriptProperties().getProperty(PROP.telegramChatId) || '').trim(),
+    testTelegramChatId: String(input.testTelegramChatId || PropertiesService.getScriptProperties().getProperty(PROP.testTelegramChatId) || PropertiesService.getScriptProperties().getProperty(PROP.telegramChatId) || '').trim()
+  };
+}
+
+function applyCustomParsing_(text, settings) {
+  let value = String(text || '');
+  if (settings.stripBefore) {
+    const start = value.toLowerCase().indexOf(settings.stripBefore.toLowerCase());
+    if (start >= 0) value = value.slice(start + settings.stripBefore.length);
+  }
+  if (settings.stripAfter) {
+    const end = value.toLowerCase().indexOf(settings.stripAfter.toLowerCase());
+    if (end >= 0) value = value.slice(0, end);
+  }
+  if (settings.removePatterns) {
+    settings.removePatterns.split('\n').map(x => x.trim()).filter(Boolean).forEach(pattern => {
+      try { value = value.replace(new RegExp(pattern, 'gim'), ' '); }
+      catch (_) { throw new Error('Invalid removal pattern: ' + pattern); }
+    });
+  }
+  return value.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function clamp_(value, min, max, fallback) {
+  return isFinite(value) && value >= min && value <= max ? Math.round(value) : fallback;
+}
