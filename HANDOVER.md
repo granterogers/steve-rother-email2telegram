@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 5 deployed on 25 October 2026; access restricted to the owner |
+| Private dashboard | Version 5 currently deployed; Version 6 source prepared and tested locally on 25 October 2026 |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +25,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-The requested inbox-testing dashboard is deployed in Apps Script Version 5: **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. The existing `/exec` URL was visually verified to show these controls on 25 October 2026.
+The inbox-testing dashboard includes **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. The Version 6 update restricts scanning to the active Inbox, resolves the destination ID to a readable Telegram name/type, shows Gemini rewrite timing, removes tracking-link clutter, and redistributes trailing images through the post.
 
 ## Resources
 
@@ -81,7 +81,7 @@ Manage these under **Apps Script → Project Settings → Script properties** or
 1. Ensure the Apps Script editor contains the repository versions of `Code.gs` and `Index.html`, and the manifest matches `appsscript.json`.
 2. Create a new web-app deployment/version, keeping **Execute as: Me** and **Who has access: Only myself**.
 3. Open the private dashboard and run **Validate connections**.
-4. Click **Scan my inbox**, choose one or more verified newsletters, and click **Generate selected previews**. This sends only the selected newsletter content to the configured Gemini API; it does not contact Telegram or modify Gmail.
+4. Click **Scan my inbox**, choose one or more verified newsletters, and click **Generate selected previews**. Only active Inbox messages are scanned; archived, Spam, and Trash messages are excluded. This sends only the selected newsletter content to the configured Gemini API; it does not contact Telegram or modify Gmail.
 5. Confirm every preview displays real images, clickable event/source links, and no unresolved `[[IMAGE_n]]` or `[[LINK_n]]` placeholders.
 6. Choose the **Telegram test destination** using discovery or a known group/channel ID. This setting is separate from production.
 7. Send previews individually or use **Send all generated previews**. Confirm the messages in Telegram and verify Gmail remains unlabelled.
@@ -96,9 +96,9 @@ Steps 2, 4, 7, 8, 9, and 11 are deliberate authorization/publication gates and s
 
 - **Parsing & writing** edits sender/query boundaries, cleanup patterns, prompt, model, length, and image count.
 - **Connections** stores keys in Script Properties, discovers Telegram groups, and validates Gmail/Gemini/Telegram configuration.
-- **Test preview** scans the inbox using production-grade identification, supports selecting up to ten newsletters, and renders each final Telegram rich message—not placeholder tokens—including clickable hyperlinks and images.
+- **Test preview** scans only the active Inbox using production-grade identification, supports selecting up to ten newsletters, and renders each final Telegram rich message—not placeholder tokens—including direct clickable hyperlinks and images distributed through the post.
 - Each preview carries a server-generated signature; edited or stale payloads are refused by the test-send endpoint.
-- A separate customizable test destination can be selected from groups/channels visible to the bot without changing the production destination.
+- A separate customizable test destination can be selected from groups/channels visible to the bot without changing the production destination. The dashboard shows its readable Telegram title/type as well as the underlying ID.
 - Individual and send-all test actions require in-page confirmation and never mark Gmail processed.
 
 ## Deployment notes
