@@ -53,6 +53,12 @@ const fourteenLinksHtml = Array.from({ length: 14 }, (_, i) => `<a href="https:/
 const fourteenLinks = sandbox.htmlToImageAwareText_(fourteenLinksHtml, 8, 30);
 assert.strictEqual(fourteenLinks.links.length, 14);
 assert(fourteenLinks.text.includes('[[LINK_14]]'));
+const styled = sandbox.htmlToImageAwareText_('<h2>Important heading</h2><p>Normal <strong>bold</strong> and <em>italic</em>.</p><a href="https://steverother.org/styled"><b>Styled link</b></a>', 8, 30);
+assert(styled.text.includes('[[B]] Important heading [[/B]]'));
+assert(styled.text.includes('[[B]] bold [[/B]]'));
+assert(styled.text.includes('[[I]] italic [[/I]]'));
+assert.deepStrictEqual(Array.from(sandbox.protectedMarkerSequence_(styled.text)).slice(-3), ['[[B]]', '[[LINK_1]]', '[[/B]]']);
+assert.strictEqual(sandbox.telegramTextHtml_('A [[B]]bold[[/B]] and [[I]]italic[[/I]] [[LINK_1]]', styled.links), 'A <b>bold</b> and <i>italic</i> <a href="https://steverother.org/styled">Styled link</a>');
 
 const markerPost = sandbox.ensureImageMarkers_('Intro\n\n[[IMAGE_1]]\n\nClosing', imageAware.images);
 assert.strictEqual((markerPost.match(/\[\[IMAGE_1\]\]/g) || []).length, 1);
