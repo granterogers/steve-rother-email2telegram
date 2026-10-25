@@ -32,6 +32,7 @@ const PROP = Object.freeze({
   geminiKey: 'GEMINI_API_KEY',
   telegramToken: 'TELEGRAM_BOT_TOKEN',
   telegramChatId: 'TELEGRAM_CHAT_ID',
+  testTelegramChatId: 'TEST_TELEGRAM_CHAT_ID',
   testMessageId: 'TEST_MESSAGE_ID',
   liveMode: 'LIVE_MODE',
   approvedMessageId: 'LIVE_APPROVED_MESSAGE_ID',
@@ -74,6 +75,7 @@ function saveDashboardSettings(input) {
   props.setProperty('UI_CONFIG', JSON.stringify(clean));
   if (clean.testMessageId) props.setProperty(PROP.testMessageId, clean.testMessageId);
   if (clean.telegramChatId) props.setProperty(PROP.telegramChatId, clean.telegramChatId);
+  if (clean.testTelegramChatId) props.setProperty(PROP.testTelegramChatId, clean.testTelegramChatId);
   return getDashboardState();
 }
 
@@ -89,6 +91,38 @@ function runDashboardDryTest() {
   result.testedAt = new Date().toISOString();
   PropertiesService.getScriptProperties().setProperty(PROP.lastTestResult, JSON.stringify(result));
   return result;
+}
+
+function scanInboxForNewsletters() {
+  const settings = getSettings_();
+  const threads = GmailApp.search(settings.gmailQuery, 0, 50);
+  const results = [];
+  threads.forEach(thread => thread.getMessages().forEach(message => {
+    if (!isNewsletter_(message)) return;
+    results.push({
+      messageId: message.getId(),
+      threadId: thread.getId(),
+      subject: message.getSubject(),
+      from: message.getFrom(),
+      receivedAt: message.getDate().toISOString(),
+      processed: isProcessed_(message.getId())
+    });
+  }));
+  results.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+  return results;
+}
+
+function runDashboardDryTests(messageIds) {
+  const ids = Array.isArray(messageIds) ? messageIds.map(String).filter(Boolean) : [];
+  if (!ids.length) throw new Error('Select at least one newsletter.');
+  if (ids.length > 10) throw new Error('Select no more than 10 newsletters in one test run.');
+  const uniqueIds = ids.filter((id, index) => ids.indexOf(id) === index);
+  return uniqueIds.map(messageId => {
+    const result = processMessageById_(messageId, { testMode: true });
+    result.testedAt = new Date().toISOString();
+    result.previewSignature = signTestPreview_(result);
+    return result;
+  });
 }
 
 function testHistoricalNewsletter() {
@@ -108,17 +142,37 @@ function getLastTestResult() {
   return JSON.parse(raw);
 }
 
-function sendDashboardTestPreview(confirmPhrase) {
-  if (String(confirmPhrase || '') !== 'SEND PREVIEW TO TEST GROUP') throw new Error('Test publication confirmation was not supplied.');
-  const result = getLastTestResult();
+function sendDashboardTestPreview(input) {
+  input = input || {};
+  if (String(input.confirmPhrase || '') !== 'SEND PREVIEW TO TEST GROUP') throw new Error('Test publication confirmation was not supplied.');
+  const result = {
+    messageId: String(input.messageId || ''),
+    proposedPost: String(input.proposedPost || ''),
+    images: Array.isArray(input.images) ? input.images : [],
+    links: Array.isArray(input.links) ? input.links : []
+  };
+  if (!result.messageId || !result.proposedPost) throw new Error('The selected preview is incomplete. Generate it again.');
+  if (String(input.previewSignature || '') !== signTestPreview_(result)) throw new Error('The preview changed after generation. Generate it again before sending.');
+  const destination = String(input.telegramChatId || '').trim();
+  if (!destination) throw new Error('Choose a Telegram test destination.');
+  const destinationInfo = telegramGetChat_(destination);
   const images = result.images || [];
   const links = result.links || [];
-  const rich = telegramTrySendRich_(result.proposedPost, images, links);
-  if (rich) return { sent: true, mode: 'rich', messageIds: [rich.message_id], gmailModified: false };
+  const rich = telegramTrySendRich_(result.proposedPost, images, links, destination);
+  if (rich) return { sent: true, mode: 'rich', messageIds: [rich.message_id], gmailModified: false, destination: destinationInfo };
 
   const items = buildFallbackPublicationItems_(result.proposedPost, images, getSettings_().maxTelegramChars, links);
-  const messageIds = items.map(item => (item.type === 'photo' ? telegramSendPhoto_(item.url) : telegramSend_(item.text)).message_id);
-  return { sent: true, mode: 'ordered_sequence', messageIds: messageIds, gmailModified: false };
+  const messageIds = items.map(item => (item.type === 'photo' ? telegramSendPhoto_(item.url, destination) : telegramSend_(item.text, destination)).message_id);
+  return { sent: true, mode: 'ordered_sequence', messageIds: messageIds, gmailModified: false, destination: destinationInfo };
+}
+
+function signTestPreview_(result) {
+  return digest_(JSON.stringify({
+    messageId: String(result.messageId || ''),
+    proposedPost: String(result.proposedPost || ''),
+    images: result.images || [],
+    links: result.links || []
+  }));
 }
 
 function validateConfiguration() {
@@ -172,6 +226,14 @@ function discoverTelegramChats() {
     throw new Error('No Telegram groups or channels were found. Send one ordinary message in the test group, then try discovery again.');
   }
   return result;
+}
+
+function saveDashboardTestDestination(chatId) {
+  const value = String(chatId || '').trim();
+  if (!value) throw new Error('Choose a Telegram test destination.');
+  const chat = telegramGetChat_(value);
+  PropertiesService.getScriptProperties().setProperty(PROP.testTelegramChatId, value);
+  return chat;
 }
 
 function installHourlyTrigger() {
@@ -533,10 +595,10 @@ function publishIdempotently_(messageId, post, images, links) {
   return { messageIds: journal.sent, resumed: resumed };
 }
 
-function telegramTrySendRich_(post, images, links) {
+function telegramTrySendRich_(post, images, links, chatIdOverride) {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
-  const chatId = requireProperty_(props, PROP.telegramChatId);
+  const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendRichMessage', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     payload: JSON.stringify({ chat_id: chatId, rich_message: { html: buildTelegramRichHtml_(post, images, links) } })
@@ -589,10 +651,10 @@ function buildFallbackPublicationItems_(post, images, limit, links) {
   return items;
 }
 
-function telegramSendPhoto_(url) {
+function telegramSendPhoto_(url, chatIdOverride) {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
-  const chatId = requireProperty_(props, PROP.telegramChatId);
+  const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
   const response = fetchWithRetry_('https://api.telegram.org/bot' + token + '/sendPhoto', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     payload: JSON.stringify({ chat_id: chatId, photo: url })
@@ -602,10 +664,10 @@ function telegramSendPhoto_(url) {
   return data.result;
 }
 
-function telegramSend_(text) {
+function telegramSend_(text, chatIdOverride) {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
-  const chatId = requireProperty_(props, PROP.telegramChatId);
+  const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
   const url = 'https://api.telegram.org/bot' + token + '/sendMessage';
   const response = fetchWithRetry_(url, {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
@@ -624,10 +686,10 @@ function telegramGetMe_() {
   return { id: data.result.id, username: data.result.username, name: data.result.first_name };
 }
 
-function telegramGetChat_() {
+function telegramGetChat_(chatIdOverride) {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
-  const chatId = requireProperty_(props, PROP.telegramChatId);
+  const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getChat?chat_id=' + encodeURIComponent(chatId), { muteHttpExceptions: true });
   const data = JSON.parse(response.getContentText());
   if (!data.ok) throw new Error('Telegram destination validation failed.');
@@ -746,7 +808,8 @@ function sanitizeSettings_(input) {
     postPrefix: String(input.postPrefix || '').trim(),
     postSuffix: String(input.postSuffix || '').trim(),
     testMessageId: String(input.testMessageId || PropertiesService.getScriptProperties().getProperty(PROP.testMessageId) || defaults.testMessageId).trim(),
-    telegramChatId: String(input.telegramChatId || PropertiesService.getScriptProperties().getProperty(PROP.telegramChatId) || '').trim()
+    telegramChatId: String(input.telegramChatId || PropertiesService.getScriptProperties().getProperty(PROP.telegramChatId) || '').trim(),
+    testTelegramChatId: String(input.testTelegramChatId || PropertiesService.getScriptProperties().getProperty(PROP.testTelegramChatId) || PropertiesService.getScriptProperties().getProperty(PROP.telegramChatId) || '').trim()
   };
 }
 
