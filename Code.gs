@@ -522,12 +522,14 @@ function rewriteWithGemini_(extracted) {
   const linkInstruction = extracted.links.length
     ? '\n\nLINK RULES:\nThe cleaned source contains protected markers such as [[LINK_1]]. Each marker renders as the original clickable link label, so preserve every marker exactly once and do not repeat its label immediately before or after it. Never invent, edit, shorten, or replace a link marker.'
     : '';
-  const formatInstruction = '\n\nREADABILITY RULES:\nUse short, naturally spaced paragraphs. Use simple bullet points for lists of dates, events, benefits, or actions. Leave a blank line between sections. Avoid dense text walls and unnecessary headings.';
-  const prompt = settings.rewritePrompt + formatInstruction + imageInstruction + linkInstruction + '\n\nNEWSLETTER SUBJECT:\n' + extracted.subject + '\n\nCLEANED SOURCE:\n' + extracted.text;
+  const structureInstruction = '\n\nNON-NEGOTIABLE FIDELITY RULES:\nThis is a faithful Telegram conversion, not a reorganisation. Work through the source from top to bottom. Preserve the original heading, paragraph, section, event, image and link order. Preserve every [[IMAGE_n]] and [[LINK_n]] marker exactly once and in the exact combined order in which the markers occur in the source. Keep each marker beside the same surrounding content; never collect images or links elsewhere. Do not merge separate source sections, invent a new section, move a call-to-action, or add a More information section. Lightly shorten repetitive prose only where needed for Telegram, without changing the newsletter hierarchy.';
+  const formatInstruction = '\n\nREADABILITY RULES:\nRetain the source section breaks. Use short, naturally spaced paragraphs and simple bullets only where the source already presents a list. Leave a blank line between sections. Avoid adding new headings.';
+  const expectedMarkers = protectedMarkerSequence_(extracted.text).join(' ');
+  const prompt = settings.rewritePrompt + structureInstruction + formatInstruction + imageInstruction + linkInstruction + '\n\nREQUIRED MARKER SEQUENCE (copy exactly):\n' + expectedMarkers + '\n\nNEWSLETTER SUBJECT:\n' + extracted.subject + '\n\nCLEANED SOURCE:\n' + extracted.text;
   const payload = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
-      temperature: 0.45,
+      temperature: 0.15,
       maxOutputTokens: 4096,
       // Gemini 3 thinking tokens count toward maxOutputTokens. Rewriting is a
       // straightforward editorial task, so keep reasoning minimal and reserve
@@ -549,10 +551,31 @@ function rewriteWithGemini_(extracted) {
   if (!output) throw new Error('Gemini returned no usable text.');
   output = [settings.postPrefix, output, settings.postSuffix].filter(Boolean).join('\n\n').trim();
   output = stripTrackingUrlsFromPost_(output);
-  if (output.length > settings.maxTelegramChars) output = intelligentlyTrim_(output, settings.maxTelegramChars);
-  output = ensureImageMarkers_(output, extracted.images);
-  output = ensureLinkMarkers_(output, extracted.links);
+  output = normalizeProtectedMarkers_(output);
+  assertFaithfulMarkerStructure_(extracted.text, output);
+  (extracted.links || []).forEach(link => { output = removeDuplicateLinkLabel_(output, link); });
+  if (output.length > settings.maxTelegramChars) {
+    throw new Error('The faithful Telegram draft exceeds the configured length. Nothing was published; shorten prose without moving or removing images and links.');
+  }
   return output;
+}
+
+function normalizeProtectedMarkers_(value) {
+  return String(value || '')
+    .replace(/\[\[\s*IMAGE[_ -]?(\d+)\s*\]\]/gi, '[[IMAGE_$1]]')
+    .replace(/\[\[\s*LINK[_ -]?(\d+)\s*\]\]/gi, '[[LINK_$1]]');
+}
+
+function protectedMarkerSequence_(value) {
+  return normalizeProtectedMarkers_(value).match(/\[\[(?:IMAGE|LINK)_\d+\]\]/g) || [];
+}
+
+function assertFaithfulMarkerStructure_(source, draft) {
+  const expected = protectedMarkerSequence_(source);
+  const actual = protectedMarkerSequence_(draft);
+  if (expected.length !== actual.length || expected.some((marker, index) => marker !== actual[index])) {
+    throw new Error('The AI changed the newsletter image/link order or duplicated/omitted a marker, so this preview was rejected. Nothing was sent or marked processed.');
+  }
 }
 
 function ensureImageMarkers_(post, images) {
