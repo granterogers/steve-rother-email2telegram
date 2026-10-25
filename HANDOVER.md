@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Deployed; access restricted to the owner |
+| Private dashboard | Version 5 deployed on 25 October 2026; access restricted to the owner |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +25,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-The repository now includes the requested inbox-testing dashboard: **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. This repository update still requires a new Apps Script web-app deployment before it appears at the existing `/exec` URL.
+The requested inbox-testing dashboard is deployed in Apps Script Version 5: **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. The existing `/exec` URL was visually verified to show these controls on 25 October 2026.
 
 ## Resources
 
@@ -148,8 +148,7 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 
 ## Known remaining work
 
-- Deploy the current editor code as a new Apps Script web-app version.
-- Test **Scan my inbox** and generate previews for one and several newsletters.
+- Test **Scan my inbox** and generate previews for one and several newsletters. The button is deployed, but no inbox scan has yet been run against Version 5.
 - Verify the rich-message preview visually in the deployed dashboard.
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
