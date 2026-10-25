@@ -59,6 +59,12 @@ const directLink = linked.links.find(link => link.url === 'https://steverother.o
 const editorialLink = { marker: '[[LINK_1]]', url: directLink.url, label: directLink.label };
 const linkPost = sandbox.ensureLinkMarkers_(markerPost + '\n\nEvent [[LINK_1]]', [editorialLink]);
 assert.strictEqual((linkPost.match(/\[\[LINK_1\]\]/g) || []).length, 1);
+const duplicateLabelPost = sandbox.ensureLinkMarkers_('Read Event details [[LINK_1]] now.', [editorialLink]);
+assert.strictEqual(duplicateLabelPost, 'Read [[LINK_1]] now.');
+const duplicateLabelHtml = sandbox.richTextWithLinks_(duplicateLabelPost, [editorialLink]);
+assert.strictEqual((duplicateLabelHtml.match(/Event details/g) || []).length, 1);
+const urlOnlyLink = { marker: '[[LINK_9]]', url: 'https://example.org', label: 'https://example.org' };
+assert.strictEqual(sandbox.expandLinkMarkers_('Visit [[LINK_9]]', [urlOnlyLink]), 'Visit https://example.org');
 const fallbackItems = sandbox.buildFallbackPublicationItems_(linkPost, imageAware.images, 3800, [editorialLink]);
 assert.deepStrictEqual(Array.from(fallbackItems, item => item.type), ['text', 'photo', 'text', 'photo', 'text']);
 assert.strictEqual(fallbackItems[0].text, 'Intro');
