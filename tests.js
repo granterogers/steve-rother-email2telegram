@@ -25,13 +25,14 @@ const cleaned = sandbox.htmlToCleanText_(dirty);
 assert(cleaned.includes('Walking Each Other Home'));
 assert(cleaned.includes('A warm & useful teaching.'));
 assert(cleaned.includes('[[LINK_1]]'));
-assert(!cleaned.includes('[[LINK_2]]'));
-assert(!cleaned.includes('click.mlsend.com'));
+assert(cleaned.includes('[[LINK_2]]'));
+assert(!cleaned.includes('https://click.mlsend.com'));
 assert(!cleaned.toLowerCase().includes('you received this email'));
 const linked = sandbox.htmlToImageAwareText_(dirty, 0);
-assert.strictEqual(linked.links.length, 1);
-assert.strictEqual(linked.links[0].url, 'https://steverother.org/event');
-assert.strictEqual(linked.links[0].label, 'Event details');
+assert.strictEqual(linked.links.length, 2);
+assert(linked.links.some(link => link.url === 'https://steverother.org/event'));
+assert(linked.links.some(link => link.label === 'Tracked CTA'));
+assert(linked.links.some(link => link.label === 'Event details'));
 
 const imageHtml = `<html><body>
 <p>Opening teaching</p>
@@ -54,7 +55,8 @@ const rebalancedPost = sandbox.ensureImageMarkers_('Intro\n\nMiddle\n\nClosing\n
 assert(!/\[\[IMAGE_1\]\]\s*\[\[IMAGE_2\]\]\s*$/.test(rebalancedPost));
 assert(rebalancedPost.indexOf('[[IMAGE_1]]') < rebalancedPost.indexOf('Middle'));
 assert(rebalancedPost.indexOf('[[IMAGE_2]]') < rebalancedPost.indexOf('Closing'));
-const editorialLink = { marker: '[[LINK_1]]', url: linked.links[0].url, label: linked.links[0].label };
+const directLink = linked.links.find(link => link.url === 'https://steverother.org/event');
+const editorialLink = { marker: '[[LINK_1]]', url: directLink.url, label: directLink.label };
 const linkPost = sandbox.ensureLinkMarkers_(markerPost + '\n\nEvent [[LINK_1]]', [editorialLink]);
 assert.strictEqual((linkPost.match(/\[\[LINK_1\]\]/g) || []).length, 1);
 const fallbackItems = sandbox.buildFallbackPublicationItems_(linkPost, imageAware.images, 3800, [editorialLink]);
@@ -81,6 +83,11 @@ assert.strictEqual(sandbox.isTrackingUrl_('https://click.mlsend.com/a'), true);
 assert.strictEqual(sandbox.isTrackingUrl_('https://links.mailerlite.com/a'), true);
 assert.strictEqual(sandbox.isTrackingUrl_('https://steverother.org/a'), false);
 assert(!sandbox.stripTrackingUrlsFromPost_('Read https://click.mlsend.com/a now').includes('mlsend.com'));
+const originalPreview = sandbox.sanitizeOriginalEmailPreview_('<html><head><style>.cta{background:#b4a985}</style></head><body><a class="cta" href="https://click.mlsend.com/a">Book now</a><img class="open_img" width="1" height="1" src="https://click.mlsend.com/o"></body></html>');
+assert(originalPreview.includes('background:#b4a985'));
+assert(originalPreview.includes('Book now'));
+assert(originalPreview.includes('href="#"'));
+assert(!originalPreview.includes('open_img'));
 assert.strictEqual(sandbox.digest_('same'), sandbox.digest_('same'));
 assert.notStrictEqual(sandbox.digest_('same'), sandbox.digest_('different'));
 
