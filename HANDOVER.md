@@ -1,6 +1,6 @@
 # Full handover
 
-Updated: 16 September 2026
+Updated: 25 October 2026
 
 ## Outcome and current state
 
@@ -24,6 +24,8 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Duplicate-prevention live check | Not yet performed |
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
+
+The repository now includes the requested inbox-testing dashboard: **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. This repository update still requires a new Apps Script web-app deployment before it appears at the existing `/exec` URL.
 
 ## Resources
 
@@ -67,6 +69,7 @@ Manage these under **Apps Script → Project Settings → Script properties** or
 | `GEMINI_API_KEY` | Existing Gemini key; never commit it |
 | `TELEGRAM_BOT_TOKEN` | Existing BotFather token; never commit it |
 | `TELEGRAM_CHAT_ID` | Numeric test group/channel ID; never commit it in this public repository |
+| `TEST_TELEGRAM_CHAT_ID` | Optional test-only group/channel ID; changing it does not alter production |
 | `TEST_MESSAGE_ID` | The privately selected historical Gmail message ID |
 | `LIVE_MODE` | Keep `false` until the controlled publication is approved |
 | `LIVE_APPROVED_MESSAGE_ID` | Blank except during the one-item controlled release |
@@ -78,10 +81,10 @@ Manage these under **Apps Script → Project Settings → Script properties** or
 1. Ensure the Apps Script editor contains the repository versions of `Code.gs` and `Index.html`, and the manifest matches `appsscript.json`.
 2. Create a new web-app deployment/version, keeping **Execute as: Me** and **Who has access: Only myself**.
 3. Open the private dashboard and run **Validate connections**.
-4. Run **Run historical dry test**. This sends the sample newsletter content to the configured Gemini API but does not contact Telegram or modify Gmail.
-5. Confirm the preview displays the real six images (or the newly detected count), clickable event/source links, and no unresolved `[[IMAGE_n]]` or `[[LINK_n]]` placeholders.
-6. Editorially review the complete output.
-7. Use **Send this preview to Telegram test group** for the isolated Telegram rendering test. Confirm the message in Telegram and verify Gmail remains unlabelled.
+4. Click **Scan my inbox**, choose one or more verified newsletters, and click **Generate selected previews**. This sends only the selected newsletter content to the configured Gemini API; it does not contact Telegram or modify Gmail.
+5. Confirm every preview displays real images, clickable event/source links, and no unresolved `[[IMAGE_n]]` or `[[LINK_n]]` placeholders.
+6. Choose the **Telegram test destination** using discovery or a known group/channel ID. This setting is separate from production.
+7. Send previews individually or use **Send all generated previews**. Confirm the messages in Telegram and verify Gmail remains unlabelled.
 8. If approved for production, call `approveExactlyOneMessageForLivePublication('<approved Gmail message ID>')` using the private ID shown in the dashboard.
 9. Run `runApprovedMessageOnce`. Confirm Telegram success, then confirm the Gmail processed label appears.
 10. Run `runApprovedMessageOnce` again and verify the result is `duplicate_prevented` with no second Telegram publication.
@@ -93,8 +96,10 @@ Steps 2, 4, 7, 8, 9, and 11 are deliberate authorization/publication gates and s
 
 - **Parsing & writing** edits sender/query boundaries, cleanup patterns, prompt, model, length, and image count.
 - **Connections** stores keys in Script Properties, discovers Telegram groups, and validates Gmail/Gemini/Telegram configuration.
-- **Test preview** runs the historical dry test and renders the final Telegram rich message—not placeholder tokens—including clickable hyperlinks and images.
-- **Send this preview to Telegram test group** publishes only the stored preview after an in-page confirmation; it does not mark Gmail processed.
+- **Test preview** scans the inbox using production-grade identification, supports selecting up to ten newsletters, and renders each final Telegram rich message—not placeholder tokens—including clickable hyperlinks and images.
+- Each preview carries a server-generated signature; edited or stale payloads are refused by the test-send endpoint.
+- A separate customizable test destination can be selected from groups/channels visible to the bot without changing the production destination.
+- Individual and send-all test actions require in-page confirmation and never mark Gmail processed.
 
 ## Deployment notes
 
@@ -144,9 +149,9 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 ## Known remaining work
 
 - Deploy the current editor code as a new Apps Script web-app version.
-- Rerun the historical dry test so the saved preview includes the new protected links.
+- Test **Scan my inbox** and generate previews for one and several newsletters.
 - Verify the rich-message preview visually in the deployed dashboard.
-- Send the preview to the Telegram test group and inspect Telegram's actual rendering.
+- Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
 - Verify duplicate prevention with a second run.
 - Install the hourly trigger only after the controlled publication passes.
