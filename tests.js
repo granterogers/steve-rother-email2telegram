@@ -49,6 +49,10 @@ assert(imageAware.text.includes('[[IMAGE_2]]'));
 assert.strictEqual(imageAware.images[0].alt, 'Steve speaking');
 const linkedImage = sandbox.htmlToImageAwareText_('<a href="https://steverother.org/video"><img src="https://cdn.example.org/video.jpg" width="640" height="360" alt="Video"><span>Watch</span></a>', 8);
 assert.deepStrictEqual(Array.from(sandbox.protectedMarkerSequence_(linkedImage.text)), ['[[IMAGE_1]]', '[[LINK_1]]']);
+const fourteenLinksHtml = Array.from({ length: 14 }, (_, i) => `<a href="https://steverother.org/item-${i + 1}">Useful item ${i + 1}</a>`).join('\n');
+const fourteenLinks = sandbox.htmlToImageAwareText_(fourteenLinksHtml, 8, 30);
+assert.strictEqual(fourteenLinks.links.length, 14);
+assert(fourteenLinks.text.includes('[[LINK_14]]'));
 
 const markerPost = sandbox.ensureImageMarkers_('Intro\n\n[[IMAGE_1]]\n\nClosing', imageAware.images);
 assert.strictEqual((markerPost.match(/\[\[IMAGE_1\]\]/g) || []).length, 1);
