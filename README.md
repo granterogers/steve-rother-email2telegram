@@ -37,7 +37,7 @@ Set `TEST_MESSAGE_ID` privately to the Gmail message selected for dry-run testin
 1. Open the private dashboard and save the Gemini key and Telegram bot token. Keep `LIVE_MODE=false` and no approved message ID.
 2. Validate the connections, then open **Test preview** and click **Scan my inbox**.
 3. Select one or more strictly verified newsletters and click **Generate selected previews**. Up to ten can be tested together.
-4. Review each exact rich-message preview: rewritten text, real images in position, and clickable hyperlinks. This does not publish or label Gmail.
+4. Compare the tracking-cleaned original email with the Telegram result side by side. Edit the wording/spacing, move images earlier or later, or remove images; the live preview updates immediately. This does not publish or label Gmail.
 5. Choose a separate **Telegram test destination**. Use **Discover Telegram destinations** to select any group or channel visible to the bot.
 6. Send one preview individually or click **Send all generated previews** and accept the explicit confirmation. Test publication never marks Gmail processed and does not alter the production destination.
 7. Only after editorial approval, run `approveExactlyOneMessageForLivePublication('MESSAGE_ID')`.
@@ -50,6 +50,8 @@ Set `TEST_MESSAGE_ID` privately to the Gmail message selected for dry-run testin
 `scanInboxForNewsletters()` restricts the configured Gmail query to the active Inbox (`in:inbox -in:trash -in:spam`) and then applies the same strict header validation used by production. Archived, Spam, and Trash messages are excluded. The dashboard returns only subject, sender, date, processed state, and private Gmail identifiers needed for the test session; it does not expose message bodies during scanning.
 
 Selected newsletters are rewritten only when **Generate selected previews** is clicked. Each returned preview is signed by the server. The test-send endpoint rejects a preview if its text, images, links, or Gmail identifier have changed after generation.
+
+Intentional dashboard edits use a separate server-side re-signing step that first validates the original preview, then signs the exact edited text and image list. This preserves the anti-tampering check while allowing editorial changes.
 
 `TEST_TELEGRAM_CHAT_ID` stores the optional test-only destination. It defaults to the production destination when unset, but changing it never changes `TELEGRAM_CHAT_ID`. The dashboard resolves the numeric ID through Telegram and displays the group/channel name and type beside it.
 
