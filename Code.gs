@@ -95,7 +95,11 @@ function runDashboardDryTest() {
 
 function scanInboxForNewsletters() {
   const settings = getSettings_();
-  const threads = GmailApp.search(settings.gmailQuery, 0, 50);
+  // The interactive tester deliberately scans only mail that is currently in
+  // Inbox. Archived, Spam and Trash items must never appear in this picker,
+  // even if an older saved UI query was broader.
+  const inboxQuery = '(' + settings.gmailQuery + ') in:inbox -in:trash -in:spam';
+  const threads = GmailApp.search(inboxQuery, 0, 50);
   const results = [];
   threads.forEach(thread => thread.getMessages().forEach(message => {
     if (!isNewsletter_(message)) return;
@@ -234,6 +238,12 @@ function saveDashboardTestDestination(chatId) {
   const chat = telegramGetChat_(value);
   PropertiesService.getScriptProperties().setProperty(PROP.testTelegramChatId, value);
   return chat;
+}
+
+function getTelegramDestinationInfo(chatId) {
+  const value = String(chatId || '').trim();
+  if (!value) return null;
+  return telegramGetChat_(value);
 }
 
 function installHourlyTrigger() {
@@ -418,7 +428,7 @@ function htmlToImageAwareText_(html, maxImages) {
       const decodedUrl = decodeHtmlEntities_(url).trim();
       const cleanLabel = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
-      if (blockedLabel.test(cleanLabel)) return ' ' + cleanLabel + ' ';
+      if (blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return ' ' + cleanLabel + ' ';
       if (!decodedUrl || seenLinks[decodedUrl]) return ' ' + cleanLabel + ' ';
       seenLinks[decodedUrl] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
@@ -509,6 +519,7 @@ function rewriteWithGemini_(extracted) {
   }
   if (!output) throw new Error('Gemini returned no usable text.');
   output = [settings.postPrefix, output, settings.postSuffix].filter(Boolean).join('\n\n').trim();
+  output = stripTrackingUrlsFromPost_(output);
   if (output.length > settings.maxTelegramChars) output = intelligentlyTrim_(output, settings.maxTelegramChars);
   output = ensureImageMarkers_(output, extracted.images);
   output = ensureLinkMarkers_(output, extracted.links);
@@ -517,17 +528,43 @@ function rewriteWithGemini_(extracted) {
 
 function ensureImageMarkers_(post, images) {
   let output = String(post || '').replace(/\[\[\s*IMAGE[_ -]?(\d+)\s*\]\]/gi, '[[IMAGE_$1]]');
+  const trailing = output.match(/(?:\s*\[\[IMAGE_\d+\]\]\s*)+$/);
+  const redistribute = {};
+  if (trailing) {
+    (trailing[0].match(/\[\[IMAGE_\d+\]\]/g) || []).forEach(marker => { redistribute[marker] = true; });
+    output = output.slice(0, trailing.index).trim();
+  }
+  const missing = [];
   (images || []).forEach(image => {
     const marker = image.marker;
     const first = output.indexOf(marker);
-    if (first < 0) output += '\n\n' + marker;
+    if (first < 0 || redistribute[marker]) missing.push(image);
     else {
       const before = output.slice(0, first + marker.length);
       const after = output.slice(first + marker.length).split(marker).join('');
       output = before + after;
     }
   });
+  if (missing.length) output = interleaveMissingImages_(output, missing, images || []);
   return output.trim();
+}
+
+function interleaveMissingImages_(post, missingImages, allImages) {
+  const blocks = String(post || '').split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+  const textCount = Math.max(1, blocks.filter(block => !/^\[\[IMAGE_\d+\]\]$/.test(block)).length);
+  missingImages.forEach(image => {
+    const sourceIndex = Math.max(0, allImages.findIndex(item => item.marker === image.marker));
+    const desiredTextPosition = Math.max(1, Math.ceil((sourceIndex + 1) * textCount / (Math.max(1, allImages.length) + 1)));
+    let seenText = 0;
+    let insertAt = blocks.length;
+    for (let i = 0; i < blocks.length; i++) {
+      if (!/^\[\[IMAGE_\d+\]\]$/.test(blocks[i])) seenText++;
+      if (seenText >= desiredTextPosition) { insertAt = i + 1; break; }
+    }
+    while (insertAt < blocks.length && /^\[\[IMAGE_\d+\]\]$/.test(blocks[insertAt])) insertAt++;
+    blocks.splice(insertAt, 0, image.marker);
+  });
+  return blocks.join('\n\n');
 }
 
 function ensureLinkMarkers_(post, links) {
@@ -535,7 +572,16 @@ function ensureLinkMarkers_(post, links) {
   (links || []).forEach(link => {
     const marker = link.marker;
     const first = output.indexOf(marker);
-    if (first < 0) output += '\n\n' + (link.label || 'Source') + ' ' + marker;
+    if (first < 0) {
+      const label = String(link.label || '').trim();
+      const matchAt = label ? output.toLowerCase().indexOf(label.toLowerCase()) : -1;
+      if (matchAt >= 0) {
+        const insertAt = matchAt + label.length;
+        output = output.slice(0, insertAt) + ' ' + marker + output.slice(insertAt);
+      } else {
+        output += '\n\nMore information: ' + marker;
+      }
+    }
     else {
       const before = output.slice(0, first + marker.length);
       const after = output.slice(first + marker.length).split(marker).join('');
@@ -761,7 +807,19 @@ function requireProperty_(props, name) {
 }
 
 function stripTags_(value) { return String(value || '').replace(/<[^>]+>/g, ' '); }
-function isTrackingUrl_(value) { return /(?:click\.mlsend\.com|unsubscribe|mailto:)/i.test(String(value || '')); }
+function isTrackingUrl_(value) { return /(?:(?:^|\/\/)(?:[^/]+\.)?(?:mlsend\.com|mailerlite\.com)\b|unsubscribe|mailto:)/i.test(String(value || '')); }
+function isUsefulNewsletterLink_(url, label) {
+  const value = String(url || '').trim();
+  const text = String(label || '').trim();
+  if (!/^https:\/\//i.test(value) || isTrackingUrl_(value)) return false;
+  if (/\b(?:facebook|instagram|youtube|twitter|linkedin|pinterest)\.com\b/i.test(value) && /^(?:facebook|instagram|youtube|x|twitter|linkedin|pinterest)?$/i.test(text)) return false;
+  return !/^(?:unsubscribe|manage preferences|view in browser|share|forward)$/i.test(text);
+}
+function stripTrackingUrlsFromPost_(post) {
+  return String(post || '').replace(/https?:\/\/[^\s<>()]+/gi, function(url) {
+    return isTrackingUrl_(url.replace(/[.,;:!?]+$/, '')) ? '' : url;
+  }).replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
 function escapeHtml_(value) { return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
 function escapeRegex_(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function parseJson_(value) { try { return value ? JSON.parse(value) : null; } catch (_) { return null; } }
