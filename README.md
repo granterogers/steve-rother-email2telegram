@@ -47,11 +47,11 @@ Set `TEST_MESSAGE_ID` privately to the Gmail message selected for dry-run testin
 
 ## Inbox testing workflow
 
-`scanInboxForNewsletters()` searches using the configured Gmail query and then applies the same strict header validation used by production. The dashboard returns only subject, sender, date, processed state, and private Gmail identifiers needed for the test session; it does not expose message bodies during scanning.
+`scanInboxForNewsletters()` restricts the configured Gmail query to the active Inbox (`in:inbox -in:trash -in:spam`) and then applies the same strict header validation used by production. Archived, Spam, and Trash messages are excluded. The dashboard returns only subject, sender, date, processed state, and private Gmail identifiers needed for the test session; it does not expose message bodies during scanning.
 
 Selected newsletters are rewritten only when **Generate selected previews** is clicked. Each returned preview is signed by the server. The test-send endpoint rejects a preview if its text, images, links, or Gmail identifier have changed after generation.
 
-`TEST_TELEGRAM_CHAT_ID` stores the optional test-only destination. It defaults to the production destination when unset, but changing it never changes `TELEGRAM_CHAT_ID`.
+`TEST_TELEGRAM_CHAT_ID` stores the optional test-only destination. It defaults to the production destination when unset, but changing it never changes `TELEGRAM_CHAT_ID`. The dashboard resolves the numeric ID through Telegram and displays the group/channel name and type beside it.
 
 ## Disable
 
@@ -61,7 +61,7 @@ Run `disableAutomation`. It removes production triggers and resets `LIVE_MODE=fa
 
 The Gmail query is narrowed to `mailmanager@espavo.org`, then each candidate must pass at least four independent bulk-newsletter checks: exact From address, MailerLite `Message-ID`, bulk precedence, unsubscribe header, MailerLite feedback header, `espavo.org` DKIM evidence, and multipart/alternative MIME. Personal messages from `steve@espavo.org` cannot pass.
 
-Meaningful remote newsletter images are retained in source order. Tracking pixels, social icons, logos, spacers, duplicate URLs, and undersized layout graphics are removed. Useful editorial links—including labelled MailerLite redirect links—are represented by protected `[[LINK_n]]` markers before Gemini sees the content. Images use protected `[[IMAGE_n]]` markers. Missing or duplicated markers are repaired deterministically after rewriting, so Gemini cannot silently alter or omit their destinations. The dashboard resolves both marker types into real images and clickable links.
+Meaningful remote newsletter images are retained in source order. Tracking pixels, social icons, logos, spacers, duplicate URLs, undersized layout graphics, MailerLite/mlsend redirects, unsubscribe links, and other boilerplate destinations are removed. Direct useful editorial links are represented by protected `[[LINK_n]]` markers before Gemini sees the content. Images use protected `[[IMAGE_n]]` markers. Missing markers are repaired deterministically, and a trailing image pile-up is redistributed across the rewritten paragraphs. The dashboard resolves both marker types into real images and clickable links. Preview progress distinguishes the fast local parse from the hosted Gemini rewrite and reports elapsed time.
 
 The live path first uses Telegram `sendRichMessage` so paragraphs and images appear as one interleaved post. If the destination rejects rich messages, it falls back to consecutive text and photo messages in the same order. After every confirmed Telegram message, a private publication journal stores its Telegram message ID and next item index. Retries resume after the last confirmed item. A separate processed record is then written and the Gmail thread is labelled `Espavo/Telegram-Processed`. Gmail is never labelled before Telegram confirms success.
 
