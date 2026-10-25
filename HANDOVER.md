@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 5 currently deployed; Version 6 source prepared and tested locally on 25 October 2026 |
+| Private dashboard | Version 7 deployed on 25 October 2026; access restricted to the owner |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +25,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-The inbox-testing dashboard includes **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. The Version 6 update restricts scanning to the active Inbox, resolves the destination ID to a readable Telegram name/type, shows Gemini rewrite timing, removes tracking-link clutter, and redistributes trailing images through the post.
+The inbox-testing dashboard includes **Scan my inbox**, strict newsletter results, one-or-many selection (maximum ten), multi-preview generation, individually signed previews, a separate customizable Telegram test destination, individual sends, and send-all testing. Version 7 restricts scanning to the active Inbox, resolves the destination ID to a readable Telegram name/type, shows Gemini rewrite timing, removes tracking-link clutter, and redistributes trailing images through the post. The existing `/exec` URL was visually verified with these controls on 25 October 2026.
 
 ## Resources
 
@@ -148,7 +148,7 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 
 ## Known remaining work
 
-- Test **Scan my inbox** and generate previews for one and several newsletters. The button is deployed, but no inbox scan has yet been run against Version 5.
+- Test **Scan my inbox** and generate previews for one and several newsletters. The Version 7 controls are deployed, but no inbox scan has been run by the implementation agent.
 - Verify the rich-message preview visually in the deployed dashboard.
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
