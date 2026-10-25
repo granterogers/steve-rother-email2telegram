@@ -37,7 +37,7 @@ Set `TEST_MESSAGE_ID` privately to the Gmail message selected for dry-run testin
 1. Open the private dashboard and save the Gemini key and Telegram bot token. Keep `LIVE_MODE=false` and no approved message ID.
 2. Validate the connections, then open **Test preview** and click **Scan my inbox**.
 3. Select one or more strictly verified newsletters and click **Generate selected previews**. Up to ten can be tested together.
-4. Compare the tracking-cleaned original email with the Telegram result side by side. Edit the wording/spacing, move images earlier or later, or remove images; the live preview updates immediately. This does not publish or label Gmail.
+4. Compare a sandboxed rendering of the real newsletter HTML with the Telegram result side by side. The source pane retains the email's colours, spacing, headings, images and styled CTA buttons while disabling links and removing tracking pixels. Edit the Telegram wording/spacing, move images earlier or later, or remove images; the live preview updates immediately. This does not publish or label Gmail.
 5. Choose a separate **Telegram test destination**. Use **Discover Telegram destinations** to select any group or channel visible to the bot.
 6. Send one preview individually or click **Send all generated previews** and accept the explicit confirmation. Test publication never marks Gmail processed and does not alter the production destination.
 7. Only after editorial approval, run `approveExactlyOneMessageForLivePublication('MESSAGE_ID')`.
