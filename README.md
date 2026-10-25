@@ -11,7 +11,7 @@ The production path is fail-closed. `LIVE_MODE` must be `true`; the controlled f
 | File | Purpose |
 | --- | --- |
 | `Code.gs` | Gmail matching, extraction, Gemini rewrite, Telegram publication, locks, retries, journals, labels, and dashboard API |
-| `Index.html` | Private Apps Script dashboard for parsing settings, connection checks, dry runs, final rich-message preview, and test-group publication |
+| `Index.html` | Private Apps Script dashboard for parsing settings, inbox scanning, multi-select dry runs, final rich-message previews, destination selection, and test publication |
 | `appsscript.json` | Apps Script runtime, timezone, and OAuth scopes |
 | `tests.js` | Local tests for cleaning, image/link preservation, rich HTML, fallback ordering, chunking, and idempotency helpers |
 | `HANDOVER.md` | Current deployment state, exact continuation plan, safety gates, and maintenance notes |
@@ -35,14 +35,23 @@ Set `TEST_MESSAGE_ID` privately to the Gmail message selected for dry-run testin
 ## Safe sequence
 
 1. Open the private dashboard and save the Gemini key and Telegram bot token. Keep `LIVE_MODE=false` and no approved message ID.
-2. Click **Discover groups** to select a group/channel seen by the bot. If none appears, send one ordinary message in the test group and retry.
-3. Validate connections, then run the historical dry test from **Test preview**.
-4. Review the exact rich-message preview: rewritten text, real images in position, and clickable hyperlinks. This does not publish or label Gmail.
-5. To test Telegram rendering, click **Send this preview to Telegram test group** and accept the explicit confirmation. This publishes only the stored preview and never marks Gmail processed.
-6. Only after editorial approval, run `approveExactlyOneMessageForLivePublication('MESSAGE_ID')`.
-7. Run `runApprovedMessageOnce` once.
-8. Run it again; the result must be `duplicate_prevented` and Telegram must receive nothing new.
-9. Run `installHourlyTrigger` only after the controlled live test passes.
+2. Validate the connections, then open **Test preview** and click **Scan my inbox**.
+3. Select one or more strictly verified newsletters and click **Generate selected previews**. Up to ten can be tested together.
+4. Review each exact rich-message preview: rewritten text, real images in position, and clickable hyperlinks. This does not publish or label Gmail.
+5. Choose a separate **Telegram test destination**. Use **Discover Telegram destinations** to select any group or channel visible to the bot.
+6. Send one preview individually or click **Send all generated previews** and accept the explicit confirmation. Test publication never marks Gmail processed and does not alter the production destination.
+7. Only after editorial approval, run `approveExactlyOneMessageForLivePublication('MESSAGE_ID')`.
+8. Run `runApprovedMessageOnce` once.
+9. Run it again; the result must be `duplicate_prevented` and Telegram must receive nothing new.
+10. Run `installHourlyTrigger` only after the controlled live test passes.
+
+## Inbox testing workflow
+
+`scanInboxForNewsletters()` searches using the configured Gmail query and then applies the same strict header validation used by production. The dashboard returns only subject, sender, date, processed state, and private Gmail identifiers needed for the test session; it does not expose message bodies during scanning.
+
+Selected newsletters are rewritten only when **Generate selected previews** is clicked. Each returned preview is signed by the server. The test-send endpoint rejects a preview if its text, images, links, or Gmail identifier have changed after generation.
+
+`TEST_TELEGRAM_CHAT_ID` stores the optional test-only destination. It defaults to the production destination when unset, but changing it never changes `TELEGRAM_CHAT_ID`.
 
 ## Disable
 
