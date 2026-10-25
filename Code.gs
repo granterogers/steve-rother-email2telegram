@@ -454,14 +454,16 @@ function htmlToImageAwareText_(html, maxImages) {
     })
     .replace(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function(_, url, label) {
       const decodedUrl = decodeHtmlEntities_(url).trim();
+      const embeddedImageMarkers = (String(label).match(/\[\[IMAGE_\d+\]\]/g) || []).join(' ');
       const cleanLabel = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
-      if (links.length >= 12 || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return ' ' + cleanLabel + ' ';
-      if (!decodedUrl || seenLinks[decodedUrl]) return ' ' + cleanLabel + ' ';
+      const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
+      if (links.length >= 12 || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
+      if (!decodedUrl || seenLinks[decodedUrl]) return preservedContent;
       seenLinks[decodedUrl] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
       links.push({ marker: marker, url: decodedUrl, label: cleanLabel || decodedUrl });
-      return ' ' + (cleanLabel ? cleanLabel + ' ' : '') + marker + ' ';
+      return ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + (cleanLabel ? cleanLabel + ' ' : '') + marker + ' ';
     })
     .replace(/<\/?(?:p|div|tr|table|h[1-6]|li|ul|ol|br|section|article|figure)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, ' ');
