@@ -367,6 +367,7 @@ function processMessage_(message, options) {
     images: extracted.images,
     linkCount: extracted.links.length,
     links: extracted.links,
+    originalHtmlPreview: extracted.originalHtmlPreview || '',
     cleanedSourcePreview: extracted.text.slice(0, 8000),
     proposedPost: proposedPost
   };
@@ -416,6 +417,7 @@ function extractNewsletter_(message) {
     text: text,
     images: imageAware.images,
     links: imageAware.links || [],
+    originalHtmlPreview: html ? sanitizeOriginalEmailPreview_(html) : '',
     assumptions: [
       html ? 'Used the HTML edition because the plain-text part is only a view-in-browser fallback.' : 'Used the plain-text edition.',
       'Removed MailerLite tracking, unsubscribe, postal-address, social-share, and repeated navigation boilerplate.',
@@ -454,7 +456,7 @@ function htmlToImageAwareText_(html, maxImages) {
       const decodedUrl = decodeHtmlEntities_(url).trim();
       const cleanLabel = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
-      if (blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return ' ' + cleanLabel + ' ';
+      if (links.length >= 12 || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return ' ' + cleanLabel + ' ';
       if (!decodedUrl || seenLinks[decodedUrl]) return ' ' + cleanLabel + ' ';
       seenLinks[decodedUrl] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
@@ -872,9 +874,26 @@ function isTrackingUrl_(value) { return /(?:(?:^|\/\/)(?:[^/]+\.)?(?:mlsend\.com
 function isUsefulNewsletterLink_(url, label) {
   const value = String(url || '').trim();
   const text = String(label || '').trim();
-  if (!/^https:\/\//i.test(value) || isTrackingUrl_(value)) return false;
+  if (!/^https:\/\//i.test(value)) return false;
+  const meaningfulLabel = text.length >= 4 && !/^(?:click here|read more|learn more|website|link)$/i.test(text);
+  if (isTrackingUrl_(value) && !(/(?:^|\.)mlsend\.com\//i.test(value) && meaningfulLabel)) return false;
   if (/\b(?:facebook|instagram|youtube|twitter|linkedin|pinterest)\.com\b/i.test(value) && /^(?:facebook|instagram|youtube|x|twitter|linkedin|pinterest)?$/i.test(text)) return false;
   return !/^(?:unsubscribe|manage preferences|view in browser|share|forward)$/i.test(text);
+}
+function sanitizeOriginalEmailPreview_(html) {
+  let value = String(html || '').slice(0, 180000);
+  value = value
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(?:script|iframe|object|embed|form|button)\b[\s\S]*?<\/(?:script|iframe|object|embed|form|button)>/gi, '')
+    .replace(/<(?:script|iframe|object|embed|form|input|button)\b[^>]*\/?>/gi, '')
+    .replace(/<meta\b[^>]*http-equiv=["']?refresh["']?[^>]*>/gi, '')
+    .replace(/@import\s+url\([^)]*\)\s*;?/gi, '')
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/<img\b[^>]*(?:class=["'][^"']*open_img[^"']*["']|width=["']?1["']?[^>]*height=["']?1["']?|height=["']?0["']?)[^>]*>/gi, '')
+    .replace(/\s+href\s*=\s*(?:"[^"]*"|'[^']*')/gi, ' href="#"')
+    .replace(/\s+target\s*=\s*(?:"[^"]*"|'[^']*')/gi, '');
+  const guard = '<style>html,body{margin:0!important;padding:0!important;background:#fff!important;overflow-x:auto}a{cursor:default!important}img{max-width:100%;height:auto}body{pointer-events:none}</style>';
+  return value.replace(/<head[^>]*>/i, '$&' + guard);
 }
 function stripTrackingUrlsFromPost_(post) {
   return String(post || '').replace(/https?:\/\/[^\s<>()]+/gi, function(url) {
