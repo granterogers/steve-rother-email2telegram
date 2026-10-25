@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 7 deployed; next dashboard/editor release prepared and locally verified on 25 October 2026 |
+| Private dashboard | Version 8 deployed and visually verified on 25 October 2026; access restricted to the owner |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +25,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-The next dashboard release makes testing the primary screen; explains why live mode and scheduling are safely off; moves uncommon configuration and secrets into collapsible sections; expands Telegram destination metadata and bot permissions; compares the tracking-cleaned original with the Telegram result side by side; and allows text edits plus image reordering/removal before a test send. Edited previews retain server-side signature protection.
+Version 8 makes testing the primary screen; explains why live mode and scheduling are safely off; moves uncommon configuration and secrets into collapsible sections; expands Telegram destination metadata and bot permissions; compares the tracking-cleaned original with the Telegram result side by side; and allows text edits plus image reordering/removal before a test send. Edited previews retain server-side signature protection.
 
 ## Resources
 
