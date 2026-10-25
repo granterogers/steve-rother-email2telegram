@@ -78,4 +78,16 @@ assert.strictEqual(sandbox.isTrackingUrl_('https://steverother.org/a'), false);
 assert.strictEqual(sandbox.digest_('same'), sandbox.digest_('same'));
 assert.notStrictEqual(sandbox.digest_('same'), sandbox.digest_('different'));
 
+const signedPreview = {
+  messageId: 'message-1',
+  proposedPost: linkPost,
+  images: imageAware.images,
+  links: [editorialLink]
+};
+assert.strictEqual(sandbox.signTestPreview_(signedPreview), sandbox.signTestPreview_(signedPreview));
+assert.notStrictEqual(
+  sandbox.signTestPreview_(signedPreview),
+  sandbox.signTestPreview_(Object.assign({}, signedPreview, { proposedPost: linkPost + ' changed' }))
+);
+
 console.log('All local helper tests passed.');
