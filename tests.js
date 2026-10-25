@@ -65,6 +65,10 @@ const duplicateLabelHtml = sandbox.richTextWithLinks_(duplicateLabelPost, [edito
 assert.strictEqual((duplicateLabelHtml.match(/Event details/g) || []).length, 1);
 const urlOnlyLink = { marker: '[[LINK_9]]', url: 'https://example.org', label: 'https://example.org' };
 assert.strictEqual(sandbox.expandLinkMarkers_('Visit [[LINK_9]]', [urlOnlyLink]), 'Visit https://example.org');
+assert.deepStrictEqual(Array.from(sandbox.protectedMarkerSequence_('A [[IMAGE_1]] B [[LINK_2]]')), ['[[IMAGE_1]]', '[[LINK_2]]']);
+assert.doesNotThrow(() => sandbox.assertFaithfulMarkerStructure_('[[IMAGE_1]] x [[LINK_1]]', 'copy [[IMAGE_1]] text [[LINK_1]]'));
+assert.throws(() => sandbox.assertFaithfulMarkerStructure_('[[IMAGE_1]] [[LINK_1]]', '[[LINK_1]] [[IMAGE_1]]'), /changed the newsletter image\/link order/);
+assert.throws(() => sandbox.assertFaithfulMarkerStructure_('[[IMAGE_1]] [[LINK_1]]', '[[IMAGE_1]] [[LINK_1]] [[LINK_1]]'), /duplicated\/omitted/);
 const fallbackItems = sandbox.buildFallbackPublicationItems_(linkPost, imageAware.images, 3800, [editorialLink]);
 assert.deepStrictEqual(Array.from(fallbackItems, item => item.type), ['text', 'photo', 'text', 'photo', 'text']);
 assert.strictEqual(fallbackItems[0].text, 'Intro');
