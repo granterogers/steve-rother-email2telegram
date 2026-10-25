@@ -445,6 +445,12 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<(?:strong|b)\b[^>]*>/gi, ' [[B]] ')
+    .replace(/<\/(?:strong|b)>/gi, ' [[/B]] ')
+    .replace(/<(?:em|i)\b[^>]*>/gi, ' [[I]] ')
+    .replace(/<\/(?:em|i)>/gi, ' [[/I]] ')
+    .replace(/<h[1-3]\b[^>]*>/gi, '\n[[B]] ')
+    .replace(/<\/h[1-3]>/gi, ' [[/B]]\n')
     .replace(/<img\b[^>]*>/gi, function(tag) {
       if (images.length >= maxImages) return ' ';
       const candidate = newsletterImageFromTag_(tag);
@@ -457,7 +463,10 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
     .replace(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function(_, url, label) {
       const decodedUrl = decodeHtmlEntities_(url).trim();
       const embeddedImageMarkers = (String(label).match(/\[\[IMAGE_\d+\]\]/g) || []).join(' ');
-      const cleanLabel = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '').replace(/\s+/g, ' ').trim();
+      const labelText = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '');
+      const hasBold = /\[\[B\]\]/.test(labelText);
+      const hasItalic = /\[\[I\]\]/.test(labelText);
+      const cleanLabel = labelText.replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
       const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
       if (links.length >= linkLimit || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
@@ -465,7 +474,9 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
       seenLinks[decodedUrl] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
       links.push({ marker: marker, url: decodedUrl, label: cleanLabel || decodedUrl });
-      return ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + (cleanLabel ? cleanLabel + ' ' : '') + marker + ' ';
+      const openStyle = (hasBold ? '[[B]] ' : '') + (hasItalic ? '[[I]] ' : '');
+      const closeStyle = (hasItalic ? ' [[/I]]' : '') + (hasBold ? ' [[/B]]' : '');
+      return ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + openStyle + (cleanLabel ? cleanLabel + ' ' : '') + marker + closeStyle + ' ';
     })
     .replace(/<\/?(?:p|div|tr|table|h[1-6]|li|ul|ol|br|section|article|figure)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, ' ');
@@ -526,7 +537,7 @@ function rewriteWithGemini_(extracted) {
   const linkInstruction = extracted.links.length
     ? '\n\nLINK RULES:\nThe cleaned source contains protected markers such as [[LINK_1]]. Each marker renders as the original clickable link label, so preserve every marker exactly once and do not repeat its label immediately before or after it. Never invent, edit, shorten, or replace a link marker.'
     : '';
-  const structureInstruction = '\n\nNON-NEGOTIABLE FIDELITY RULES:\nThis is a faithful Telegram conversion, not a reorganisation. Work through the source from top to bottom. Preserve the original heading, paragraph, section, event, image and link order. Preserve every [[IMAGE_n]] and [[LINK_n]] marker exactly once and in the exact combined order in which the markers occur in the source. Keep each marker beside the same surrounding content; never collect images or links elsewhere. Do not merge separate source sections, invent a new section, move a call-to-action, or add a More information section. Lightly shorten repetitive prose only where needed for Telegram, without changing the newsletter hierarchy.';
+  const structureInstruction = '\n\nNON-NEGOTIABLE FIDELITY RULES:\nThis is a faithful Telegram conversion, not a reorganisation. Work through the source from top to bottom. Preserve the original heading, paragraph, section, event, image and link order. Preserve every [[IMAGE_n]], [[LINK_n]], [[B]], [[/B]], [[I]] and [[/I]] marker exactly once and in the exact combined order in which the markers occur in the source. These protected style markers reproduce the original bold and italic emphasis in Telegram. Keep each marker beside the same surrounding content; never collect images, links or formatting elsewhere. Do not merge separate source sections, invent a new section, move a call-to-action, or add a More information section. Lightly shorten repetitive prose only where needed for Telegram, without changing the newsletter hierarchy.';
   const formatInstruction = '\n\nREADABILITY RULES:\nRetain the source section breaks. Use short, naturally spaced paragraphs and simple bullets only where the source already presents a list. Leave a blank line between sections. Avoid adding new headings.';
   const expectedMarkers = protectedMarkerSequence_(extracted.text).join(' ');
   const prompt = settings.rewritePrompt + structureInstruction + formatInstruction + imageInstruction + linkInstruction + '\n\nREQUIRED MARKER SEQUENCE (copy exactly):\n' + expectedMarkers + '\n\nNEWSLETTER SUBJECT:\n' + extracted.subject + '\n\nCLEANED SOURCE:\n' + extracted.text;
@@ -571,7 +582,7 @@ function normalizeProtectedMarkers_(value) {
 }
 
 function protectedMarkerSequence_(value) {
-  return normalizeProtectedMarkers_(value).match(/\[\[(?:IMAGE|LINK)_\d+\]\]/g) || [];
+  return normalizeProtectedMarkers_(value).match(/\[\[(?:IMAGE|LINK)_\d+\]\]|\[\[\/?(?:B|I)\]\]/g) || [];
 }
 
 function assertFaithfulMarkerStructure_(source, draft) {
@@ -735,8 +746,12 @@ function buildTelegramRichHtml_(post, images, links) {
 function richTextWithLinks_(text, links) {
   const byMarker = {};
   (links || []).forEach(link => { byMarker[link.marker] = link; });
-  return String(text || '').split(/(\[\[LINK_\d+\]\])/g).filter(Boolean).map(part => {
+  return String(text || '').split(/(\[\[LINK_\d+\]\]|\[\[\/?(?:B|I)\]\])/g).filter(Boolean).map(part => {
     const link = byMarker[part];
+    if (part === '[[B]]') return '<b>';
+    if (part === '[[/B]]') return '</b>';
+    if (part === '[[I]]') return '<i>';
+    if (part === '[[/I]]') return '</i>';
     return link
       ? '<a href="' + escapeHtml_(link.url) + '">' + escapeHtml_(link.label || link.url) + '</a>'
       : escapeHtml_(part);
@@ -754,13 +769,17 @@ function expandLinkMarkers_(text, links) {
   return output;
 }
 
+function telegramTextHtml_(text, links) {
+  return richTextWithLinks_(String(text || ''), links);
+}
+
 function buildFallbackPublicationItems_(post, images, limit, links) {
   const byMarker = {};
   (images || []).forEach(image => { byMarker[image.marker] = image; });
   const items = [];
   String(post || '').split(/(\[\[IMAGE_\d+\]\])/g).filter(Boolean).forEach(part => {
     if (byMarker[part]) items.push({ type: 'photo', url: byMarker[part].url });
-    else splitTelegram_(expandLinkMarkers_(part, links), limit).filter(Boolean).forEach(text => items.push({ type: 'text', text: text }));
+    else splitTelegram_(part, limit).filter(Boolean).forEach(text => items.push({ type: 'text', text: telegramTextHtml_(text, links) }));
   });
   return items;
 }
@@ -785,7 +804,7 @@ function telegramSend_(text, chatIdOverride) {
   const url = 'https://api.telegram.org/bot' + token + '/sendMessage';
   const response = fetchWithRetry_(url, {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ chat_id: chatId, text: text, disable_web_page_preview: false })
+    payload: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: false })
   }, 'Telegram');
   const data = JSON.parse(response.getContentText());
   if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm publication.');
