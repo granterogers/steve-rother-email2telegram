@@ -449,8 +449,8 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
     .replace(/<\/(?:strong|b)>/gi, ' [[/B]] ')
     .replace(/<(?:em|i)\b[^>]*>/gi, ' [[I]] ')
     .replace(/<\/(?:em|i)>/gi, ' [[/I]] ')
-    .replace(/<h[1-3]\b[^>]*>/gi, '\n[[B]] ')
-    .replace(/<\/h[1-3]>/gi, ' [[/B]]\n')
+    .replace(/<h[1-6]\b[^>]*>/gi, '\n[[B]] ')
+    .replace(/<\/h[1-6]>/gi, ' [[/B]]\n')
     .replace(/<img\b[^>]*>/gi, function(tag) {
       if (images.length >= maxImages) return ' ';
       const candidate = newsletterImageFromTag_(tag);
@@ -460,12 +460,12 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
       images.push(candidate);
       return '\n' + candidate.marker + '\n';
     })
-    .replace(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function(_, url, label) {
+    .replace(/<a\b[^>]*href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function(tag, url, label) {
       const decodedUrl = decodeHtmlEntities_(url).trim();
       const embeddedImageMarkers = (String(label).match(/\[\[IMAGE_\d+\]\]/g) || []).join(' ');
       const labelText = stripTags_(label).replace(/\[\[IMAGE_\d+\]\]/g, '');
-      const hasBold = /\[\[B\]\]/.test(labelText);
-      const hasItalic = /\[\[I\]\]/.test(labelText);
+      const hasBold = /\[\[B\]\]/.test(labelText) || /font-weight\s*:\s*(?:bold|[6-9]00)/i.test(tag);
+      const hasItalic = /\[\[I\]\]/.test(labelText) || /font-style\s*:\s*italic/i.test(tag);
       const cleanLabel = labelText.replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
       const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
