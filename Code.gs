@@ -504,7 +504,7 @@ function newsletterImageFromTag_(tag) {
 }
 
 function applyCircularTransparency_(images) {
-  const pending = (images || []).filter(image => !image.width || !image.height);
+  const pending = images || [];
   if (pending.length) {
     try {
       const responses = UrlFetchApp.fetchAll(pending.map(image => ({
