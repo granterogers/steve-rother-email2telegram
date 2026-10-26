@@ -173,7 +173,7 @@ function sendDashboardTestPreview(input) {
   if (rich) return { sent: true, mode: 'rich', messageIds: [rich.message_id], gmailModified: false, destination: destinationInfo };
 
   const items = buildFallbackPublicationItems_(result.proposedPost, images, getSettings_().maxTelegramChars, links);
-  const messageIds = items.map(item => (item.type === 'photo' ? telegramSendPhoto_(item.url, destination) : telegramSend_(item.text, destination)).message_id);
+  const messageIds = items.map(item => (item.type === 'photo' ? telegramSendPhoto_(item.url, destination, item.originalUrl) : telegramSend_(item.text, destination)).message_id);
   return { sent: true, mode: 'ordered_sequence', messageIds: messageIds, gmailModified: false, destination: destinationInfo };
 }
 
@@ -495,10 +495,16 @@ function newsletterImageFromTag_(tag) {
   const alt = String(attrs.alt || attrs.title || '').replace(/\s+/g, ' ').trim();
   const fingerprint = (url + ' ' + alt).toLowerCase();
   if (/(?:spacer|tracking|pixel|transparent|blank|facebook|instagram|youtube|twitter|linkedin|pinterest|social[-_ ]?icon|\/logo(?:[._/-]|$)|logo[._-])/i.test(fingerprint)) return null;
-  const width = numericDimension_(attrs.width);
-  const height = numericDimension_(attrs.height);
+  const style = String(attrs.style || '');
+  const width = numericDimension_(attrs.width) || numericDimension_((style.match(/(?:^|;)\s*width\s*:\s*([^;]+)/i) || [])[1]);
+  const height = numericDimension_(attrs.height) || numericDimension_((style.match(/(?:^|;)\s*height\s*:\s*([^;]+)/i) || [])[1]);
   if ((width && width <= 120) || (height && height <= 80) || (width && height && width * height < 30000)) return null;
-  return { url: url, alt: alt, width: width || null, height: height || null };
+  const circular = width >= 300 && height >= 300 && Math.abs(width - height) / Math.max(width, height) <= 0.08;
+  return { url: circular ? circularTransparentImageUrl_(url) : url, originalUrl: circular ? url : '', circular: circular, alt: alt, width: width || null, height: height || null };
+}
+
+function circularTransparentImageUrl_(url) {
+  return 'https://images.weserv.nl/?url=' + encodeURIComponent(String(url || '')) + '&w=1200&h=1200&fit=cover&mask=circle&mtrim&output=png';
 }
 
 function numericDimension_(value) {
@@ -707,7 +713,7 @@ function publishIdempotently_(messageId, post, images, links) {
   if (journal.mode !== 'rich') {
     const items = buildFallbackPublicationItems_(post, media, settings.maxTelegramChars, preservedLinks);
     for (let i = journal.next || 0; i < items.length; i++) {
-      const sent = items[i].type === 'photo' ? telegramSendPhoto_(items[i].url) : telegramSend_(items[i].text);
+      const sent = items[i].type === 'photo' ? telegramSendPhoto_(items[i].url, null, items[i].originalUrl) : telegramSend_(items[i].text);
       journal.sent.push(sent.message_id);
       journal.next = i + 1;
       props.setProperty(key, JSON.stringify(journal));
@@ -778,23 +784,31 @@ function buildFallbackPublicationItems_(post, images, limit, links) {
   (images || []).forEach(image => { byMarker[image.marker] = image; });
   const items = [];
   String(post || '').split(/(\[\[IMAGE_\d+\]\])/g).filter(Boolean).forEach(part => {
-    if (byMarker[part]) items.push({ type: 'photo', url: byMarker[part].url });
+    if (byMarker[part]) items.push({ type: 'photo', url: byMarker[part].url, originalUrl: byMarker[part].originalUrl || '' });
     else splitTelegram_(part, limit).filter(Boolean).forEach(text => items.push({ type: 'text', text: telegramTextHtml_(text, links) }));
   });
   return items;
 }
 
-function telegramSendPhoto_(url, chatIdOverride) {
+function telegramSendPhoto_(url, chatIdOverride, fallbackUrl) {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
   const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
-  const response = fetchWithRetry_('https://api.telegram.org/bot' + token + '/sendPhoto', {
-    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ chat_id: chatId, photo: url })
-  }, 'Telegram');
-  const data = JSON.parse(response.getContentText());
-  if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm image publication.');
-  return data.result;
+  function sendPhotoUrl_(photoUrl) {
+    const response = fetchWithRetry_('https://api.telegram.org/bot' + token + '/sendPhoto', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      payload: JSON.stringify({ chat_id: chatId, photo: photoUrl })
+    }, 'Telegram');
+    const data = JSON.parse(response.getContentText());
+    if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm image publication.');
+    return data.result;
+  }
+  try {
+    return sendPhotoUrl_(url);
+  } catch (error) {
+    if (fallbackUrl && fallbackUrl !== url) return sendPhotoUrl_(fallbackUrl);
+    throw error;
+  }
 }
 
 function telegramSend_(text, chatIdOverride) {
