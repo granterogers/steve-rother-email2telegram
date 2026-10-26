@@ -481,6 +481,7 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
     .replace(/<\/?(?:p|div|tr|table|h[1-6]|li|ul|ol|br|section|article|figure)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, ' ');
   s = removeBoilerplate_(decodeHtmlEntities_(s));
+  applyCircularTransparency_(images);
   return { text: s, images: images, links: links };
 }
 
@@ -499,8 +500,33 @@ function newsletterImageFromTag_(tag) {
   const width = numericDimension_(attrs.width) || numericDimension_((style.match(/(?:^|;)\s*width\s*:\s*([^;]+)/i) || [])[1]);
   const height = numericDimension_(attrs.height) || numericDimension_((style.match(/(?:^|;)\s*height\s*:\s*([^;]+)/i) || [])[1]);
   if ((width && width <= 120) || (height && height <= 80) || (width && height && width * height < 30000)) return null;
-  const circular = width >= 300 && height >= 300 && Math.abs(width - height) / Math.max(width, height) <= 0.08;
-  return { url: circular ? circularTransparentImageUrl_(url) : url, originalUrl: circular ? url : '', circular: circular, alt: alt, width: width || null, height: height || null };
+  return { url: url, originalUrl: '', circular: false, alt: alt, width: width || null, height: height || null };
+}
+
+function applyCircularTransparency_(images) {
+  const pending = (images || []).filter(image => !image.width || !image.height);
+  if (pending.length) {
+    try {
+      const responses = UrlFetchApp.fetchAll(pending.map(image => ({
+        url: 'https://images.weserv.nl/?url=' + encodeURIComponent(image.url) + '&output=json',
+        muteHttpExceptions: true
+      })));
+      responses.forEach((response, index) => {
+        if (response.getResponseCode() !== 200) return;
+        const metadata = parseJson_(response.getContentText()) || {};
+        pending[index].width = Number(metadata.width) || pending[index].width;
+        pending[index].height = Number(metadata.height) || pending[index].height;
+      });
+    } catch (_) {}
+  }
+  (images || []).forEach(image => {
+    const width = Number(image.width || 0), height = Number(image.height || 0);
+    const circular = width >= 300 && height >= 300 && Math.abs(width - height) / Math.max(width, height) <= 0.08;
+    if (!circular) return;
+    image.originalUrl = image.url;
+    image.url = circularTransparentImageUrl_(image.url);
+    image.circular = true;
+  });
 }
 
 function circularTransparentImageUrl_(url) {
