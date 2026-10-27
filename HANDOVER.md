@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 24 deployed automatically to the valid private web-app deployment on 27 October 2026 |
+| Private dashboard | Version 26 deployed automatically to the valid private web-app deployment on 27 October 2026 |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +25,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-Version 24 presents testing as three compact tabs: Find & generate, Preview & compare, and Send test. The faithful original email now expands to its full measured height beside the Telegram rendering instead of being capped inside a scrollbar. Optional Telegram text/image editing is collapsed by default. Test-preview signatures are canonicalized across the Apps Script/browser round trip, fixing the false “preview changed after generation” rejection while retaining tamper protection. The send button shows persistent progress, Telegram confirmation, or the exact server error and blocks overlapping repeated clicks.
+Version 26 presents testing as three compact tabs: Find & generate, Preview & compare, and Send test. The faithful original email expands to its full measured height beside the Telegram rendering. Optional editing is collapsed by default. Test-preview signatures are canonicalized across the Apps Script/browser round trip. Telegram drafts enforce blank-line spacing around headings, sections, and image markers. Circular cut-outs use uncompressed PNG document uploads because Telegram's photo pipeline can flatten alpha transparency. The destination chooser now provides bot-specific setup instructions, `/connect` discovery, an in-page list, and direct `@channelusername` or numeric-ID verification.
 
 The next release replaces the source-side text reconstruction with a sandboxed rendering of the actual Gmail HTML. It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing tracking pixels, scripts and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body.
 
@@ -34,7 +34,7 @@ The next release replaces the source-side text reconstruction with a sandboxed r
 - GitHub: <https://github.com/granterogers/steve-rother-email2telegram>
 - The Apps Script project ID, editor URL, private web-app URL, Gmail account, Gmail message IDs, Telegram destination ID, and credentials are deliberately retained only in the owner's private Google configuration.
 
-The valid owner-only web-app deployment serves Apps Script Version 24. GitHub Actions now pushes source, creates a version, and updates this deployment automatically when Apps Script source changes on `main`. The manifest explicitly retains the private web-app entry point. A separate historical deployment without a web-app entry point was mistakenly updated to Version 19 and must not be used as the production deployment target.
+The valid owner-only web-app deployment serves Apps Script Version 26. GitHub Actions now pushes source, creates a version, and updates this deployment automatically when Apps Script source changes on `main`. The manifest explicitly retains the private web-app entry point. A separate historical deployment without a web-app entry point was mistakenly updated to Version 19 and must not be used as the production deployment target.
 
 ## Architecture
 
@@ -150,7 +150,7 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 
 ## Known remaining work
 
-- Regenerate a preview in Version 24 and perform the first test-group send. Existing Version 22 previews must be regenerated because the signature format was intentionally corrected.
+- Regenerate a preview in Version 26 and test the improved spacing and transparent-image document route. Existing previews must be regenerated to use the latest formatting and image behavior.
 - The faithful original-email rendering and editable rich Telegram preview were visually verified side by side for that sample.
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
