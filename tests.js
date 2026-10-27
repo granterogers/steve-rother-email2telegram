@@ -2,6 +2,9 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 
+const manifest = JSON.parse(fs.readFileSync(__dirname + '/appsscript.json', 'utf8'));
+assert.deepStrictEqual(manifest.webapp, { access: 'MYSELF', executeAs: 'USER_DEPLOYING' });
+
 const source = fs.readFileSync(__dirname + '/Code.gs', 'utf8');
 const sandbox = {
   console,
