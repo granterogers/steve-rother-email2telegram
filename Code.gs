@@ -37,7 +37,9 @@ const PROP = Object.freeze({
   testMessageId: 'TEST_MESSAGE_ID',
   liveMode: 'LIVE_MODE',
   approvedMessageId: 'LIVE_APPROVED_MESSAGE_ID',
-  lastTestResult: 'LAST_TEST_RESULT'
+  lastTestResult: 'LAST_TEST_RESULT',
+  controlledPublishedId: 'CONTROLLED_LIVE_PUBLISHED_ID',
+  duplicateVerifiedId: 'DUPLICATE_PREVENTION_VERIFIED_ID'
 });
 
 function scheduledRun() {
@@ -311,9 +313,11 @@ function getTelegramDestinationInfo(chatId) {
 }
 
 function installHourlyTrigger() {
-  if (PropertiesService.getScriptProperties().getProperty(PROP.liveMode) !== 'true') {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty(PROP.liveMode) !== 'true') {
     throw new Error('Refusing to install the production trigger while LIVE_MODE is not true.');
   }
+  if (!props.getProperty(PROP.duplicateVerifiedId)) throw new Error('Complete the controlled live publication and duplicate-prevention check before enabling automatic publishing.');
   removeAutomationTriggers_();
   const minutes = getSettings_().triggerEveryMinutes;
   ScriptApp.newTrigger('scheduledRun').timeBased().everyMinutes(minutes).create();
@@ -331,13 +335,64 @@ function approveExactlyOneMessageForLivePublication(messageId) {
   const props = PropertiesService.getScriptProperties();
   props.setProperty(PROP.approvedMessageId, String(messageId));
   props.setProperty(PROP.liveMode, 'true');
+  props.deleteProperty(PROP.controlledPublishedId);
+  props.deleteProperty(PROP.duplicateVerifiedId);
   return 'Exactly one Gmail message is approved for live publication.';
 }
 
 function runApprovedMessageOnce() {
   const props = PropertiesService.getScriptProperties();
   const messageId = requireProperty_(props, PROP.approvedMessageId);
-  return processMessageById_(messageId, { testMode: false, controlled: true });
+  const result = processMessageById_(messageId, { testMode: false, controlled: true });
+  if (result.status === 'published' || result.status === 'published_after_retry') props.setProperty(PROP.controlledPublishedId, messageId);
+  if (result.status === 'duplicate_prevented' && props.getProperty(PROP.controlledPublishedId) === messageId) {
+    props.setProperty(PROP.duplicateVerifiedId, messageId);
+    props.deleteProperty(PROP.approvedMessageId);
+  }
+  return result;
+}
+
+function getAutomationReadiness() {
+  const props = PropertiesService.getScriptProperties();
+  const triggerInstalled = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'scheduledRun');
+  const controlledId = props.getProperty(PROP.controlledPublishedId) || '';
+  const duplicateId = props.getProperty(PROP.duplicateVerifiedId) || '';
+  let destination = null;
+  try { if (props.getProperty(PROP.telegramChatId)) destination = telegramGetChat_(); } catch (_) {}
+  return {
+    gmailAuthorized: Boolean(Session.getEffectiveUser().getEmail()),
+    geminiConfigured: Boolean(props.getProperty(PROP.geminiKey)),
+    telegramConfigured: Boolean(props.getProperty(PROP.telegramToken)),
+    productionDestinationConfigured: Boolean(props.getProperty(PROP.telegramChatId)),
+    productionDestination: destination,
+    controlledPublicationComplete: Boolean(controlledId),
+    duplicatePreventionVerified: Boolean(duplicateId && duplicateId === controlledId),
+    liveMode: props.getProperty(PROP.liveMode) === 'true',
+    triggerInstalled: triggerInstalled,
+    intervalMinutes: getSettings_().triggerEveryMinutes,
+    fullyAutomatic: triggerInstalled && props.getProperty(PROP.liveMode) === 'true' && Boolean(duplicateId && duplicateId === controlledId)
+  };
+}
+
+function dashboardPublishApprovedMessage(input) {
+  input = input || {};
+  if (String(input.confirmPhrase || '') !== 'PUBLISH ONE APPROVED NEWSLETTER') throw new Error('The controlled-publication confirmation was not supplied.');
+  const messageId = String(input.messageId || '').trim();
+  if (!messageId) throw new Error('Choose a generated newsletter preview first.');
+  approveExactlyOneMessageForLivePublication(messageId);
+  return runApprovedMessageOnce();
+}
+
+function dashboardVerifyDuplicatePrevention(input) {
+  input = input || {};
+  if (String(input.confirmPhrase || '') !== 'VERIFY DUPLICATE PREVENTION') throw new Error('The duplicate-check confirmation was not supplied.');
+  return runApprovedMessageOnce();
+}
+
+function dashboardEnableAutomation(input) {
+  input = input || {};
+  if (String(input.confirmPhrase || '') !== 'ENABLE AUTOMATIC PUBLISHING') throw new Error('The automation confirmation was not supplied.');
+  return installHourlyTrigger();
 }
 
 function runAutomation_(options) {
@@ -415,7 +470,6 @@ function processMessage_(message, options) {
   const published = publishIdempotently_(messageId, proposedPost, extracted.images, extracted.links);
   ensureProcessedLabel_(message);
   clearErrorLabel_(message);
-  props.deleteProperty(PROP.approvedMessageId);
   result.status = published.resumed ? 'published_after_retry' : 'published';
   result.telegramMessageIds = published.messageIds;
   return result;
