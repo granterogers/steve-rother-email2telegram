@@ -198,12 +198,31 @@ function prepareEditedDashboardPreview(input) {
 }
 
 function signTestPreview_(result) {
-  return digest_(JSON.stringify({
+  return digest_(JSON.stringify(canonicalTestPreview_(result)));
+}
+
+// google.script.run may omit undefined object fields while moving a preview
+// between Apps Script and the browser. Sign only the publication fields in a
+// fixed key order so an unchanged preview survives that round trip while any
+// meaningful text, image, link, or Gmail-message change is still rejected.
+function canonicalTestPreview_(result) {
+  result = result || {};
+  return {
     messageId: String(result.messageId || ''),
     proposedPost: String(result.proposedPost || ''),
-    images: result.images || [],
-    links: result.links || []
-  }));
+    images: (Array.isArray(result.images) ? result.images : []).map(image => ({
+      marker: String(image && image.marker || ''),
+      url: String(image && image.url || ''),
+      originalUrl: String(image && image.originalUrl || ''),
+      alt: String(image && image.alt || ''),
+      circular: Boolean(image && image.circular)
+    })),
+    links: (Array.isArray(result.links) ? result.links : []).map(link => ({
+      marker: String(link && link.marker || ''),
+      url: String(link && link.url || ''),
+      label: String(link && link.label || '')
+    }))
+  };
 }
 
 function validateConfiguration() {
