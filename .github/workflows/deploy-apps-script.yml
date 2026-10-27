@@ -1,0 +1,71 @@
+name: Deploy Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Code.gs
+      - Index.html
+      - appsscript.json
+      - .github/workflows/deploy-apps-script.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-script-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+      APPS_SCRIPT_DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deployment credentials
+        id: credentials
+        shell: bash
+        run: |
+          if [[ -n "$APPS_SCRIPT_ID" && -n "$APPS_SCRIPT_DEPLOYMENT_ID" && -n "$CLASPRC_JSON" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Deployment skipped: configure APPS_SCRIPT_ID, APPS_SCRIPT_DEPLOYMENT_ID and CLASPRC_JSON repository secrets."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.credentials.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - name: Install clasp
+        if: steps.credentials.outputs.ready == 'true'
+        run: npm install --global @google/clasp
+
+      - name: Configure authenticated Apps Script project
+        if: steps.credentials.outputs.ready == 'true'
+        shell: bash
+        run: |
+          umask 077
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"."}\n' "$APPS_SCRIPT_ID" > .clasp.json
+
+      - name: Push source and update the existing web app
+        if: steps.credentials.outputs.ready == 'true'
+        shell: bash
+        run: |
+          clasp push --force
+          VERSION_OUTPUT="$(clasp version "GitHub ${GITHUB_SHA}")"
+          VERSION_NUMBER="$(printf '%s' "$VERSION_OUTPUT" | sed -nE 's/.*version ([0-9]+).*/\1/p' | tail -1)"
+          test -n "$VERSION_NUMBER"
+          clasp deploy --deploymentId "$APPS_SCRIPT_DEPLOYMENT_ID" --versionNumber "$VERSION_NUMBER" --description "GitHub ${GITHUB_SHA}"
+
+      - name: Remove temporary credentials
+        if: always() && steps.credentials.outputs.ready == 'true'
+        shell: bash
+        run: rm -f "$HOME/.clasprc.json" .clasp.json
