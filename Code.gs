@@ -169,11 +169,18 @@ function sendDashboardTestPreview(input) {
   const destinationInfo = telegramGetChat_(destination);
   const images = result.images || [];
   const links = result.links || [];
-  const rich = telegramTrySendRich_(result.proposedPost, images, links, destination);
+  // Telegram's photo/rich-image pipeline may flatten PNG alpha. Route posts
+  // containing circular cut-outs through the ordered sender so those specific
+  // images can be uploaded as uncompressed PNG documents.
+  const rich = images.some(image => image && image.circular) ? null : telegramTrySendRich_(result.proposedPost, images, links, destination);
   if (rich) return { sent: true, mode: 'rich', messageIds: [rich.message_id], gmailModified: false, destination: destinationInfo };
 
   const items = buildFallbackPublicationItems_(result.proposedPost, images, getSettings_().maxTelegramChars, links);
-  const messageIds = items.map(item => (item.type === 'photo' ? telegramSendPhoto_(item.url, destination, item.originalUrl) : telegramSend_(item.text, destination)).message_id);
+  const messageIds = items.map(item => {
+    if (item.type === 'document') return telegramSendTransparentPng_(item.url, destination).message_id;
+    if (item.type === 'photo') return telegramSendPhoto_(item.url, destination, item.originalUrl).message_id;
+    return telegramSend_(item.text, destination).message_id;
+  });
   return { sent: true, mode: 'ordered_sequence', messageIds: messageIds, gmailModified: false, destination: destinationInfo };
 }
 
@@ -272,10 +279,21 @@ function discoverTelegramChats() {
     });
   });
   const result = Object.keys(chats).map(id => chats[id]).sort((a, b) => a.title.localeCompare(b.title));
-  if (!result.length) {
-    throw new Error('No Telegram groups or channels were found. Send one ordinary message in the test group, then try discovery again.');
-  }
   return result;
+}
+
+function getTelegramBotSetupInfo() {
+  const bot = telegramGetMe_();
+  return {
+    username: bot.username ? '@' + bot.username : '',
+    name: bot.name || '',
+    instructions: [
+      'Add the bot to the Telegram group, or make it an administrator in a channel.',
+      'In a group, send /connect so Telegram exposes that group to the bot.',
+      'Return here and press Refresh available groups.',
+      'For a public channel you may instead enter its @channelusername; private destinations use their numeric ID.'
+    ]
+  };
 }
 
 function saveDashboardTestDestination(chatId) {
@@ -589,7 +607,7 @@ function rewriteWithGemini_(extracted) {
     ? '\n\nLINK RULES:\nThe cleaned source contains protected markers such as [[LINK_1]]. Each marker renders as the original clickable link label, so preserve every marker exactly once and do not repeat its label immediately before or after it. Never invent, edit, shorten, or replace a link marker.'
     : '';
   const structureInstruction = '\n\nNON-NEGOTIABLE FIDELITY RULES:\nThis is a faithful Telegram conversion, not a reorganisation. Work through the source from top to bottom. Preserve the original heading, paragraph, section, event, image and link order. Preserve every [[IMAGE_n]], [[LINK_n]], [[B]], [[/B]], [[I]] and [[/I]] marker exactly once and in the exact combined order in which the markers occur in the source. These protected style markers reproduce the original bold and italic emphasis in Telegram. Keep each marker beside the same surrounding content; never collect images, links or formatting elsewhere. Do not merge separate source sections, invent a new section, move a call-to-action, or add a More information section. Lightly shorten repetitive prose only where needed for Telegram, without changing the newsletter hierarchy.';
-  const formatInstruction = '\n\nREADABILITY RULES:\nRetain the source section breaks. Use short, naturally spaced paragraphs and simple bullets only where the source already presents a list. Leave a blank line between sections. Avoid adding new headings.';
+  const formatInstruction = '\n\nREADABILITY RULES:\nRetain the source section breaks. Use short, naturally spaced paragraphs and simple bullets only where the source already presents a list. Put a completely blank line between every distinct heading, paragraph, section, call-to-action and image marker; never run separate sections together. Avoid adding new headings.';
   const expectedMarkers = protectedMarkerSequence_(extracted.text).join(' ');
   const prompt = settings.rewritePrompt + structureInstruction + formatInstruction + imageInstruction + linkInstruction + '\n\nREQUIRED MARKER SEQUENCE (copy exactly):\n' + expectedMarkers + '\n\nNEWSLETTER SUBJECT:\n' + extracted.subject + '\n\nCLEANED SOURCE:\n' + extracted.text;
   const payload = {
@@ -618,12 +636,23 @@ function rewriteWithGemini_(extracted) {
   output = [settings.postPrefix, output, settings.postSuffix].filter(Boolean).join('\n\n').trim();
   output = stripTrackingUrlsFromPost_(output);
   output = normalizeProtectedMarkers_(output);
+  output = normalizeTelegramSpacing_(output);
   assertFaithfulMarkerStructure_(extracted.text, output);
   (extracted.links || []).forEach(link => { output = removeDuplicateLinkLabel_(output, link); });
   if (output.length > settings.maxTelegramChars) {
     throw new Error('The faithful Telegram draft exceeds the configured length. Nothing was published; shorten prose without moving or removing images and links.');
   }
   return output;
+}
+
+function normalizeTelegramSpacing_(value) {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n*[ \t]*(\[\[IMAGE_\d+\]\])[ \t]*\n*/g, '\n\n$1\n\n')
+    .replace(/(^|\n)(\[\[B\]\][^\n]{1,140}\[\[\/B\]\])\n(?!\n)/g, '$1$2\n\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function normalizeProtectedMarkers_(value) {
@@ -740,7 +769,7 @@ function publishIdempotently_(messageId, post, images, links) {
   const resumed = journal.sent.length > 0;
 
   if (!journal.mode && media.length) {
-    const rich = telegramTrySendRich_(post, media, preservedLinks);
+    const rich = media.some(image => image && image.circular) ? null : telegramTrySendRich_(post, media, preservedLinks);
     if (rich) {
       journal.mode = 'rich';
       journal.next = 1;
@@ -758,7 +787,11 @@ function publishIdempotently_(messageId, post, images, links) {
   if (journal.mode !== 'rich') {
     const items = buildFallbackPublicationItems_(post, media, settings.maxTelegramChars, preservedLinks);
     for (let i = journal.next || 0; i < items.length; i++) {
-      const sent = items[i].type === 'photo' ? telegramSendPhoto_(items[i].url, null, items[i].originalUrl) : telegramSend_(items[i].text);
+      const sent = items[i].type === 'document'
+        ? telegramSendTransparentPng_(items[i].url)
+        : items[i].type === 'photo'
+          ? telegramSendPhoto_(items[i].url, null, items[i].originalUrl)
+          : telegramSend_(items[i].text);
       journal.sent.push(sent.message_id);
       journal.next = i + 1;
       props.setProperty(key, JSON.stringify(journal));
@@ -829,7 +862,7 @@ function buildFallbackPublicationItems_(post, images, limit, links) {
   (images || []).forEach(image => { byMarker[image.marker] = image; });
   const items = [];
   String(post || '').split(/(\[\[IMAGE_\d+\]\])/g).filter(Boolean).forEach(part => {
-    if (byMarker[part]) items.push({ type: 'photo', url: byMarker[part].url, originalUrl: byMarker[part].originalUrl || '' });
+    if (byMarker[part]) items.push({ type: byMarker[part].circular ? 'document' : 'photo', url: byMarker[part].url, originalUrl: byMarker[part].originalUrl || '' });
     else splitTelegram_(part, limit).filter(Boolean).forEach(text => items.push({ type: 'text', text: telegramTextHtml_(text, links) }));
   });
   return items;
@@ -854,6 +887,23 @@ function telegramSendPhoto_(url, chatIdOverride, fallbackUrl) {
     if (fallbackUrl && fallbackUrl !== url) return sendPhotoUrl_(fallbackUrl);
     throw error;
   }
+}
+
+function telegramSendTransparentPng_(url, chatIdOverride) {
+  const props = PropertiesService.getScriptProperties();
+  const token = requireProperty_(props, PROP.telegramToken);
+  const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
+  const source = fetchWithRetry_(String(url || ''), { muteHttpExceptions: true }, 'Transparent newsletter image');
+  if (source.getResponseCode() < 200 || source.getResponseCode() >= 300) throw new Error('The transparent newsletter image could not be downloaded.');
+  const png = source.getBlob().setContentType('image/png').setName('newsletter-image.png');
+  const response = fetchWithRetry_('https://api.telegram.org/bot' + token + '/sendDocument', {
+    method: 'post',
+    payload: { chat_id: chatId, document: png },
+    muteHttpExceptions: true
+  }, 'Telegram transparent image');
+  const data = JSON.parse(response.getContentText());
+  if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm transparent image publication.');
+  return data.result;
 }
 
 function telegramSend_(text, chatIdOverride) {
