@@ -118,6 +118,16 @@ assert(originalPreview.includes('background:#b4a985'));
 assert(originalPreview.includes('Book now'));
 assert(originalPreview.includes('href="#"'));
 assert(!originalPreview.includes('open_img'));
+
+const canonicalSignedPreview = {
+  messageId: 'gmail-1',
+  proposedPost: 'Hello [[IMAGE_1]] [[LINK_1]]',
+  images: [{ marker: '[[IMAGE_1]]', url: 'https://cdn.example.org/a.png', originalUrl: undefined, alt: undefined, circular: false, width: 640 }],
+  links: [{ marker: '[[LINK_1]]', url: 'https://example.org', label: 'Read more', ignored: 'browser-only' }]
+};
+const browserRoundTrip = JSON.parse(JSON.stringify(canonicalSignedPreview));
+assert.deepStrictEqual(sandbox.canonicalTestPreview_(canonicalSignedPreview), sandbox.canonicalTestPreview_(browserRoundTrip));
+assert.strictEqual(sandbox.signTestPreview_(canonicalSignedPreview), sandbox.signTestPreview_(browserRoundTrip));
 assert.strictEqual(sandbox.digest_('same'), sandbox.digest_('same'));
 assert.notStrictEqual(sandbox.digest_('same'), sandbox.digest_('different'));
 
