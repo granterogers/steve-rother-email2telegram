@@ -43,7 +43,7 @@ Set `TEST_MESSAGE_ID` privately to the Gmail message selected for dry-run testin
 7. Only after editorial approval, run `approveExactlyOneMessageForLivePublication('MESSAGE_ID')`.
 8. Run `runApprovedMessageOnce` once.
 9. Run it again; the result must be `duplicate_prevented` and Telegram must receive nothing new.
-10. Run `installHourlyTrigger` only after the controlled live test passes.
+10. Run `installHourlyTrigger` only after the controlled live test passes. (The legacy function name is retained for compatibility; it now installs a once-daily trigger.)
 
 ## Inbox testing workflow
 
@@ -71,7 +71,7 @@ The live path first uses Telegram `sendRichMessage` so paragraphs and images app
 
 - Rewrite tone/format: edit `CONFIG.rewritePrompt`.
 - AI model: edit `CONFIG.model`.
-- Schedule: edit `CONFIG.triggerEveryMinutes` and reinstall the trigger.
+- Schedule: once daily, around 9am London time. Reinstall the trigger after changing the schedule in `installHourlyTrigger`.
 - Telegram length: edit `CONFIG.maxTelegramChars` (keep below Telegram's 4096-character limit).
 - Image limit: edit `CONFIG.maxNewsletterImages` (1-10; default 8).
 

@@ -38,7 +38,7 @@ The valid owner-only web-app deployment serves Apps Script Version 28. GitHub Ac
 
 ## Architecture
 
-1. An hourly Apps Script trigger calls `scheduledRun` when enabled.
+1. A once-daily Apps Script trigger calls `scheduledRun` around 9am London time when enabled.
 2. Gmail candidates come from a narrow sender query.
 3. `isNewsletter_` requires the exact sender plus at least four independent bulk-newsletter signals (MailerLite headers, DKIM evidence, unsubscribe header, bulk precedence, multipart MIME, etc.).
 4. The extractor removes boilerplate and trackers while retaining meaningful images and editorial links in source order.
@@ -90,7 +90,7 @@ Manage these under **Apps Script → Project Settings → Script properties** or
 8. If approved for production, call `approveExactlyOneMessageForLivePublication('<approved Gmail message ID>')` using the private ID shown in the dashboard.
 9. Run `runApprovedMessageOnce`. Confirm Telegram success, then confirm the Gmail processed label appears.
 10. Run `runApprovedMessageOnce` again and verify the result is `duplicate_prevented` with no second Telegram publication.
-11. Only after all checks pass, run `installHourlyTrigger`.
+11. Only after all checks pass, run `installHourlyTrigger`. The legacy function name now installs the once-daily schedule.
 
 Steps 2, 4, 7, 8, 9, and 11 are deliberate authorization/publication gates and should not be automated past without the owner's explicit approval at the time.
 
@@ -134,7 +134,7 @@ When deploying manually:
 - Formatting: `rewriteWithGemini_`, `buildTelegramRichHtml_`, and `Index.html` preview renderer.
 - Link behavior: `htmlToImageAwareText_`, `ensureLinkMarkers_`, `richTextWithLinks_`, and `expandLinkMarkers_`.
 - Image behavior: `newsletterImageFromTag_`, `ensureImageMarkers_`, and Telegram rich/fallback builders.
-- Schedule: `CONFIG.triggerEveryMinutes` plus trigger reinstall.
+- Schedule: once daily around 9am London time, configured in `installHourlyTrigger`; reinstall the trigger after changing it.
 
 ## Verification already completed
 
@@ -155,6 +155,6 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
 - Verify duplicate prevention with a second run.
-- Install the hourly trigger only after the controlled publication passes.
+- Install the once-daily trigger only after the controlled publication passes.
 
 Until those items are complete, the system should remain in TEST MODE with no production trigger.

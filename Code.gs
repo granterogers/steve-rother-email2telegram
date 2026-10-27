@@ -14,7 +14,7 @@ const CONFIG = Object.freeze({
   maxTelegramChars: 3800,
   maxNewsletterImages: 8,
   maxNewsletterLinks: 30,
-  triggerEveryMinutes: 60,
+  triggerEveryMinutes: 1440,
   maxRetries: 3,
   rewritePrompt: [
     'Rewrite this Espavo newsletter as one warm, clear Telegram post for Steve Rother\'s community.',
@@ -319,9 +319,8 @@ function installHourlyTrigger() {
   }
   if (!props.getProperty(PROP.duplicateVerifiedId)) throw new Error('Complete the controlled live publication and duplicate-prevention check before enabling automatic publishing.');
   removeAutomationTriggers_();
-  const minutes = getSettings_().triggerEveryMinutes;
-  ScriptApp.newTrigger('scheduledRun').timeBased().everyMinutes(minutes).create();
-  return 'Hourly trigger installed.';
+  ScriptApp.newTrigger('scheduledRun').timeBased().everyDays(1).atHour(9).create();
+  return 'Daily trigger installed. Google Apps Script will run it once each day, around 9am London time.';
 }
 
 function disableAutomation() {
@@ -1147,7 +1146,7 @@ function sanitizeSettings_(input) {
   const defaults = CONFIG;
   const sender = String(input.sender || defaults.sender).trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender)) throw new Error('Newsletter sender must be a valid email address.');
-  const triggerMinutes = [15, 30, 60].includes(Number(input.triggerEveryMinutes)) ? Number(input.triggerEveryMinutes) : 60;
+  const triggerMinutes = 1440;
   return {
     sender: sender,
     processedLabel: String(input.processedLabel || defaults.processedLabel).trim(),
