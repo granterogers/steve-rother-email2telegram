@@ -11,7 +11,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 19 deployed automatically from GitHub on 27 October 2026 |
+| Private dashboard | Version 20 deployed automatically to the valid private web-app deployment on 27 October 2026 |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +25,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-Version 19 makes testing the primary screen; explains why live mode and scheduling are safely off; moves uncommon configuration and secrets into collapsible sections; expands Telegram destination metadata and bot permissions; renders the original newsletter HTML beside the rendered Telegram preview; and places text/image editing controls underneath the comparison. The test-send button now shows persistent progress, Telegram confirmation, or the exact server error and blocks overlapping repeated clicks. Meaningfully labelled CTA links are preserved while raw tracking clutter is removed. Edited previews retain server-side signature protection.
+Version 20 makes testing the primary screen; explains why live mode and scheduling are safely off; moves uncommon configuration and secrets into collapsible sections; expands Telegram destination metadata and bot permissions; renders the original newsletter HTML beside the rendered Telegram preview; and places text/image editing controls underneath the comparison. The test-send button now shows persistent progress, Telegram confirmation, or the exact server error and blocks overlapping repeated clicks. Meaningfully labelled CTA links are preserved while raw tracking clutter is removed. Edited previews retain server-side signature protection.
 
 The next release replaces the source-side text reconstruction with a sandboxed rendering of the actual Gmail HTML. It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing tracking pixels, scripts and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body.
 
@@ -34,7 +34,7 @@ The next release replaces the source-side text reconstruction with a sandboxed r
 - GitHub: <https://github.com/granterogers/steve-rother-email2telegram>
 - The Apps Script project ID, editor URL, private web-app URL, Gmail account, Gmail message IDs, Telegram destination ID, and credentials are deliberately retained only in the owner's private Google configuration.
 
-The existing owner-only web-app URL serves Apps Script Version 19. GitHub Actions now pushes source, creates a version, and updates this existing deployment automatically when Apps Script source changes on `main`.
+The valid owner-only web-app deployment serves Apps Script Version 20. GitHub Actions now pushes source, creates a version, and updates this deployment automatically when Apps Script source changes on `main`. A separate historical deployment without a web-app entry point was mistakenly updated to Version 19 and must not be used as the production deployment target.
 
 ## Architecture
 
@@ -150,7 +150,7 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 
 ## Known remaining work
 
-- Test one or several additional newsletters if desired. The earlier Inbox scan and Gemini generation were verified against the 24 October sample; Version 19 changes only dashboard layout and test-send feedback.
+- Test one or several additional newsletters if desired. The earlier Inbox scan and Gemini generation were verified against the 24 October sample; Version 20 changes only dashboard layout and test-send feedback.
 - The faithful original-email rendering and editable rich Telegram preview were visually verified side by side for that sample.
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.
