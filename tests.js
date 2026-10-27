@@ -95,6 +95,12 @@ assert.strictEqual(fallbackItems[0].text, 'Intro');
 assert.strictEqual(fallbackItems[1].url, 'https://cdn.example.org/hero.jpg');
 assert.strictEqual(fallbackItems[3].url, 'https://cdn.example.org/second.jpg');
 assert(fallbackItems[4].text.includes('https://steverother.org/event'));
+const transparentItems = sandbox.buildFallbackPublicationItems_('Before\n\n[[IMAGE_1]]\n\nAfter', circularImage.images, 3800, []);
+assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'document', 'text']);
+assert.strictEqual(
+  sandbox.normalizeTelegramSpacing_('[[B]]Heading[[/B]]\nParagraph\n[[IMAGE_1]]\nNext'),
+  '[[B]]Heading[[/B]]\n\nParagraph\n\n[[IMAGE_1]]\n\nNext'
+);
 
 const richHtml = sandbox.buildTelegramRichHtml_(linkPost, imageAware.images, [editorialLink]);
 assert(richHtml.includes('<img src="https://cdn.example.org/hero.jpg"/>'));
