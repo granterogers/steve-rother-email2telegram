@@ -49,6 +49,10 @@ Version 29 presents testing as three compact tabs: Find & generate, Preview & co
 
 The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sanitizeOriginalEmailPreview_` in `Code.gs`, displayed in a no-script iframe in `Index.html`). It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing scripts, forms, frames, inline event handlers, meta refresh, tracking pixels and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body. Regression coverage for these removals is in `tests.js`.
 
+## Application version
+
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.1**. Apps Script's own deployment number (for example Version 29) is separate.
+
 ## Resources
 
 - GitHub: <https://github.com/granterogers/steve-rother-email2telegram>

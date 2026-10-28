@@ -6,6 +6,10 @@ const manifest = JSON.parse(fs.readFileSync(__dirname + '/appsscript.json', 'utf
 assert.deepStrictEqual(manifest.webapp, { access: 'MYSELF', executeAs: 'USER_DEPLOYING' });
 
 const source = fs.readFileSync(__dirname + '/Code.gs', 'utf8');
+const dashboardHtml = fs.readFileSync(__dirname + '/Index.html', 'utf8');
+const appVersion = source.match(/const APP_VERSION = '(\d+\.\d+\.\d+)';/);
+assert(appVersion, 'APP_VERSION must be a semantic version in Code.gs');
+assert(dashboardHtml.includes('<?= appVersion ?>'), 'dashboard header must show the template appVersion');
 const sandbox = {
   console,
   Utilities: {

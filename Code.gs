@@ -2,6 +2,8 @@
  * Espavo Gmail -> Gemini -> Telegram automation.
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
+// Bump with every change; shown in the dashboard header and checked by tests.js.
+const APP_VERSION = '1.0.1';
 
 const CONFIG = Object.freeze({
   sender: 'mailmanager@espavo.org',
@@ -47,7 +49,9 @@ function scheduledRun() {
 }
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
+  const template = HtmlService.createTemplateFromFile('Index');
+  template.appVersion = APP_VERSION;
+  return template.evaluate()
     .setTitle('Espavo Newsletter Automation')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
