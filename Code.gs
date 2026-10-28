@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 
 const CONFIG = Object.freeze({
   sender: 'mailmanager@espavo.org',
@@ -860,7 +860,7 @@ function telegramTrySendRich_(post, images, links, chatIdOverride) {
   const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendRichMessage', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ chat_id: chatId, rich_message: { html: buildTelegramRichHtml_(post, images, links) } })
+    payload: JSON.stringify({ chat_id: chatId, rich_message: { html: buildTelegramRichHtml_(post, images, links) }, link_preview_options: { is_disabled: true } })
   });
   const code = response.getResponseCode();
   const data = parseJson_(response.getContentText()) || {};
@@ -949,7 +949,7 @@ function telegramSend_(text, chatIdOverride) {
   const url = 'https://api.telegram.org/bot' + token + '/sendMessage';
   const response = fetchWithRetry_(url, {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: false })
+    payload: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true, link_preview_options: { is_disabled: true } })
   }, 'Telegram');
   const data = JSON.parse(response.getContentText());
   if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm publication.');
