@@ -47,7 +47,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 
 Version 29 presents testing as three compact tabs: Find & generate, Preview & compare, and Send test. The original email expands beside the Telegram rendering, optional editing is collapsed, spacing is normalized, and circular cut-outs use uncompressed PNG uploads. Telegram bot setup and automatic-publishing explanations are available as in-page help pop-ups. A dedicated Automatic publishing page shows Gmail, Gemini, bot, production destination, controlled-publication, duplicate-prevention, and cloud-trigger readiness. The trigger cannot be installed until the controlled live send and duplicate-prevention rerun have both succeeded. The configured trigger now runs once daily around 9am London time when enabled.
 
-The next release replaces the source-side text reconstruction with a sandboxed rendering of the actual Gmail HTML. It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing tracking pixels, scripts and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body.
+The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sanitizeOriginalEmailPreview_` in `Code.gs`, displayed in a no-script iframe in `Index.html`). It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing scripts, forms, frames, inline event handlers, meta refresh, tracking pixels and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body. Regression coverage for these removals is in `tests.js`.
 
 ## Resources
 
@@ -169,7 +169,7 @@ When deploying manually:
 
 ## Verification already completed
 
-Local checks completed successfully on 16 September 2026:
+Local checks completed successfully on 28 October 2026 (Node 22, working tree at `e45e226` plus the sanitizer regression test):
 
 ```text
 node --check < Code.gs

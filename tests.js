@@ -125,6 +125,16 @@ assert(originalPreview.includes('Book now'));
 assert(originalPreview.includes('href="#"'));
 assert(!originalPreview.includes('open_img'));
 
+const hostilePreview = sandbox.sanitizeOriginalEmailPreview_(`<html><head><meta http-equiv="refresh" content="0;url=https://evil.example"><style>@import url(https://evil.example/x.css);</style></head><body onload="alert(1)">
+<script>alert(2)</script><iframe src="https://evil.example"></iframe><form action="https://evil.example"><input name="a"></form>
+<a href='https://click.mlsend.com/x' target="_blank" onclick="x()">Go</a><button>Send</button>
+<img class="open_img" width="1" height="1" src="https://t.example/o"><object data="x"></object><embed src="y">
+<img src="https://cdn.example.org/photo.jpg" width="640" height="360"></body></html>`);
+assert(!/<script|<iframe|<form|<input|<button|<object|<embed|http-equiv|@import|onload|onclick|target=/i.test(hostilePreview));
+assert(hostilePreview.includes('<a href="#">Go</a>'));
+assert(hostilePreview.includes('src="https://cdn.example.org/photo.jpg"'));
+assert(!hostilePreview.includes('t.example'));
+
 const canonicalSignedPreview = {
   messageId: 'gmail-1',
   proposedPost: 'Hello [[IMAGE_1]] [[LINK_1]]',
