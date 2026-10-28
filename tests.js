@@ -60,9 +60,7 @@ const circularImage = sandbox.htmlToImageAwareText_('<img src="https://cdn.examp
 assert.strictEqual(circularImage.images[0].circular, true);
 assert.strictEqual(circularImage.images[0].originalUrl, 'https://cdn.example.org/oracle.jpg');
 assert(circularImage.images[0].url.includes('mask=circle'));
-assert(circularImage.images[0].url.includes('output=jpg'));
-assert(circularImage.images[0].url.includes('bg=ffffff'));
-assert(circularImage.images[0].url.includes('w=800'));
+assert(circularImage.images[0].url.includes('output=png'));
 const fourteenLinksHtml = Array.from({ length: 14 }, (_, i) => `<a href="https://steverother.org/item-${i + 1}">Useful item ${i + 1}</a>`).join('\n');
 const fourteenLinks = sandbox.htmlToImageAwareText_(fourteenLinksHtml, 8, 30);
 assert.strictEqual(fourteenLinks.links.length, 14);
@@ -102,7 +100,7 @@ assert.strictEqual(fallbackItems[1].url, 'https://cdn.example.org/hero.jpg');
 assert.strictEqual(fallbackItems[3].url, 'https://cdn.example.org/second.jpg');
 assert(fallbackItems[4].text.includes('https://steverother.org/event'));
 const transparentItems = sandbox.buildFallbackPublicationItems_('Before\n\n[[IMAGE_1]]\n\nAfter', circularImage.images, 3800, []);
-assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'photo', 'text']);
+assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'document', 'text']);
 assert.strictEqual(
   sandbox.normalizeTelegramSpacing_('[[B]]Heading[[/B]]\nParagraph\n[[IMAGE_1]]\nNext'),
   '[[B]]Heading[[/B]]\n\nParagraph\n\n[[IMAGE_1]]\n\nNext'
@@ -164,5 +162,35 @@ assert.notStrictEqual(
   sandbox.signTestPreview_(signedPreview),
   sandbox.signTestPreview_(Object.assign({}, signedPreview, { proposedPost: linkPost + ' changed' }))
 );
+
+// Fidelity: the rich and fallback publishing payloads must keep source order,
+// send each image and link once, and leave no protected markers behind.
+const sentRequests = [];
+sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: key => ({ TELEGRAM_BOT_TOKEN: 'token', TELEGRAM_CHAT_ID: '-100' })[key] || null, setProperty: () => {} }) };
+sandbox.UrlFetchApp = { fetch: (url, options) => {
+  sentRequests.push({ url, payload: JSON.parse(options.payload) });
+  return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ ok: true, result: { message_id: sentRequests.length } }) };
+} };
+const fidelityEmail = '<html><body><h1>Walking Each Other Home</h1><p>A <b>warm</b> and useful teaching on grief.</p>' +
+  '<img src="https://cdn.example.org/grief-banner.jpg" width="640" height="320" alt="Banner">' +
+  '<p>Join us on <a href="https://steverother.org/event">the event page</a> this Sunday.</p>' +
+  '<img src="https://cdn.example.org/oracle.jpg" width="700" height="700" alt="Oracle">' +
+  '<p>Second paragraph after the circle.</p></body></html>';
+const fidelityExtract = sandbox.htmlToImageAwareText_(fidelityEmail, 8, 30);
+let fidelityPost = sandbox.ensureImageMarkers_(fidelityExtract.text, fidelityExtract.images);
+fidelityPost = sandbox.ensureLinkMarkers_(fidelityPost, fidelityExtract.links);
+sandbox.telegramTrySendRich_(fidelityPost, fidelityExtract.images, fidelityExtract.links);
+const fidelityHtml = sentRequests[sentRequests.length - 1].payload.rich_message.html;
+assert.strictEqual((fidelityHtml.match(/<img /g) || []).length, fidelityExtract.images.length);
+assert.strictEqual((fidelityHtml.match(/Second paragraph after the circle/g) || []).length, 1);
+['Walking Each Other Home', 'grief-banner.jpg', 'the event page', 'oracle.jpg', 'Second paragraph'].reduce((from, token) => {
+  const at = fidelityHtml.indexOf(token);
+  assert(at > from, 'source order broken at ' + token);
+  return at;
+}, -1);
+assert(fidelityHtml.includes('<a href="https://steverother.org/event">'));
+const fidelityItems = sandbox.buildFallbackPublicationItems_(fidelityPost, fidelityExtract.images, 3800, fidelityExtract.links);
+assert.deepStrictEqual(fidelityItems.filter(item => item.type !== 'text').map(item => item.url), fidelityExtract.images.map(image => image.url));
+assert(!/\[\[(?:IMAGE|LINK)_\d+\]\]/.test(fidelityHtml + JSON.stringify(fidelityItems)));
 
 console.log('All local helper tests passed.');
