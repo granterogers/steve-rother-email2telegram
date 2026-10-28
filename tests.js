@@ -60,7 +60,8 @@ const circularImage = sandbox.htmlToImageAwareText_('<img src="https://cdn.examp
 assert.strictEqual(circularImage.images[0].circular, true);
 assert.strictEqual(circularImage.images[0].originalUrl, 'https://cdn.example.org/oracle.jpg');
 assert(circularImage.images[0].url.includes('mask=circle'));
-assert(circularImage.images[0].url.includes('output=png'));
+assert(circularImage.images[0].url.includes('output=jpg'));
+assert(circularImage.images[0].url.includes('mbg=ffffff'));
 const fourteenLinksHtml = Array.from({ length: 14 }, (_, i) => `<a href="https://steverother.org/item-${i + 1}">Useful item ${i + 1}</a>`).join('\n');
 const fourteenLinks = sandbox.htmlToImageAwareText_(fourteenLinksHtml, 8, 30);
 assert.strictEqual(fourteenLinks.links.length, 14);
@@ -100,7 +101,7 @@ assert.strictEqual(fallbackItems[1].url, 'https://cdn.example.org/hero.jpg');
 assert.strictEqual(fallbackItems[3].url, 'https://cdn.example.org/second.jpg');
 assert(fallbackItems[4].text.includes('https://steverother.org/event'));
 const transparentItems = sandbox.buildFallbackPublicationItems_('Before\n\n[[IMAGE_1]]\n\nAfter', circularImage.images, 3800, []);
-assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'document', 'text']);
+assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'photo', 'text']);
 assert.strictEqual(
   sandbox.normalizeTelegramSpacing_('[[B]]Heading[[/B]]\nParagraph\n[[IMAGE_1]]\nNext'),
   '[[B]]Heading[[/B]]\n\nParagraph\n\n[[IMAGE_1]]\n\nNext'
@@ -189,6 +190,7 @@ assert.strictEqual((fidelityHtml.match(/Second paragraph after the circle/g) || 
   return at;
 }, -1);
 assert(fidelityHtml.includes('<a href="https://steverother.org/event">'));
+assert(fidelityHtml.includes('<p><b> Walking Each Other Home </b></p><p>'), 'heading must be its own paragraph');
 const fidelityItems = sandbox.buildFallbackPublicationItems_(fidelityPost, fidelityExtract.images, 3800, fidelityExtract.links);
 assert.deepStrictEqual(fidelityItems.filter(item => item.type !== 'text').map(item => item.url), fidelityExtract.images.map(image => image.url));
 assert(!/\[\[(?:IMAGE|LINK)_\d+\]\]/.test(fidelityHtml + JSON.stringify(fidelityItems)));

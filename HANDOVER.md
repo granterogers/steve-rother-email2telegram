@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.4**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.6**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -168,7 +168,9 @@ When deploying manually:
 - Model: dashboard **Gemini model** or `CONFIG.model`.
 - Formatting: `rewriteWithGemini_`, `buildTelegramRichHtml_`, and `Index.html` preview renderer.
 - Link behavior: `htmlToImageAwareText_`, `ensureLinkMarkers_`, `richTextWithLinks_`, and `expandLinkMarkers_`.
-- Image behavior: `newsletterImageFromTag_`, `ensureImageMarkers_`, and Telegram rich/fallback builders. Circular images are sent through the ordered fallback as uncompressed PNG documents (`telegramSendTransparentPng_`); this path is unchanged from the pre-1.0.2 publisher. Version 1.0.4 restored the publisher to that code after 1.0.2 and 1.0.3 changed routing and image encoding. Link previews are disabled on text messages (`disable_web_page_preview`).
+- Image behavior: `newsletterImageFromTag_`, `ensureImageMarkers_`, and Telegram rich/fallback builders. Circular images are cut by weserv to an 800 px opaque JPEG on white (`mask=circle&mbg=ffffff&output=jpg`, from `circularTransparentImageUrl_`). `mbg` is the parameter that fills the masked corners; `bg` does not apply to JPEG output and leaves corners black. Circles then go through the same rich post as every other image, so they stay inline and in source order. A bold line on its own (a heading) is its own paragraph. Link previews are disabled on text messages (`disable_web_page_preview`). The 1.0.2 PNG-document route has been removed.
+
+To see what the publisher will send, run `node tools/telegram-preview/render.js`. It writes `email.png`, `telegram-rich.png` and `telegram-ordered.png` to `tools/telegram-preview/out/`. The renderer uses the real builders from `Code.gs` and placeholder artwork, so it shows layout and content order, not Telegram's exact styling. Only a real test send shows the true Telegram rendering.
 - Schedule: once daily around 9am London time, configured in `installHourlyTrigger`; reinstall the trigger after changing it.
 
 ## Verification already completed
