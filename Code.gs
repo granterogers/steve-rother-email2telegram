@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 
 const CONFIG = Object.freeze({
   sender: 'mailmanager@espavo.org',
@@ -175,15 +175,11 @@ function sendDashboardTestPreview(input) {
   const destinationInfo = telegramGetChat_(destination);
   const images = result.images || [];
   const links = result.links || [];
-  // Telegram's photo/rich-image pipeline may flatten PNG alpha. Route posts
-  // containing circular cut-outs through the ordered sender so those specific
-  // images can be uploaded as uncompressed PNG documents.
-  const rich = images.some(image => image && image.circular) ? null : telegramTrySendRich_(result.proposedPost, images, links, destination);
+  const rich = telegramTrySendRich_(result.proposedPost, images, links, destination);
   if (rich) return { sent: true, mode: 'rich', messageIds: [rich.message_id], gmailModified: false, destination: destinationInfo };
 
   const items = buildFallbackPublicationItems_(result.proposedPost, images, getSettings_().maxTelegramChars, links);
   const messageIds = items.map(item => {
-    if (item.type === 'document') return telegramSendTransparentPng_(item.url, destination).message_id;
     if (item.type === 'photo') return telegramSendPhoto_(item.url, destination, item.originalUrl).message_id;
     return telegramSend_(item.text, destination).message_id;
   });
@@ -623,8 +619,10 @@ function applyCircularTransparency_(images) {
   });
 }
 
+// Flatten the circle onto white as a JPEG at the email's card scale, so Telegram
+// treats it as an ordinary inline photo instead of a 2 MB PNG file attachment.
 function circularTransparentImageUrl_(url) {
-  return 'https://images.weserv.nl/?url=' + encodeURIComponent(String(url || '')) + '&w=1200&h=1200&fit=cover&mask=circle&mtrim&output=png';
+  return 'https://images.weserv.nl/?url=' + encodeURIComponent(String(url || '')) + '&w=800&h=800&fit=cover&mask=circle&bg=ffffff&output=jpg';
 }
 
 function numericDimension_(value) {
@@ -826,7 +824,7 @@ function publishIdempotently_(messageId, post, images, links) {
   const resumed = journal.sent.length > 0;
 
   if (!journal.mode && media.length) {
-    const rich = media.some(image => image && image.circular) ? null : telegramTrySendRich_(post, media, preservedLinks);
+    const rich = telegramTrySendRich_(post, media, preservedLinks);
     if (rich) {
       journal.mode = 'rich';
       journal.next = 1;
@@ -844,11 +842,9 @@ function publishIdempotently_(messageId, post, images, links) {
   if (journal.mode !== 'rich') {
     const items = buildFallbackPublicationItems_(post, media, settings.maxTelegramChars, preservedLinks);
     for (let i = journal.next || 0; i < items.length; i++) {
-      const sent = items[i].type === 'document'
-        ? telegramSendTransparentPng_(items[i].url)
-        : items[i].type === 'photo'
-          ? telegramSendPhoto_(items[i].url, null, items[i].originalUrl)
-          : telegramSend_(items[i].text);
+      const sent = items[i].type === 'photo'
+        ? telegramSendPhoto_(items[i].url, null, items[i].originalUrl)
+        : telegramSend_(items[i].text);
       journal.sent.push(sent.message_id);
       journal.next = i + 1;
       props.setProperty(key, JSON.stringify(journal));
@@ -919,7 +915,7 @@ function buildFallbackPublicationItems_(post, images, limit, links) {
   (images || []).forEach(image => { byMarker[image.marker] = image; });
   const items = [];
   String(post || '').split(/(\[\[IMAGE_\d+\]\])/g).filter(Boolean).forEach(part => {
-    if (byMarker[part]) items.push({ type: byMarker[part].circular ? 'document' : 'photo', url: byMarker[part].url, originalUrl: byMarker[part].originalUrl || '' });
+    if (byMarker[part]) items.push({ type: 'photo', url: byMarker[part].url, originalUrl: byMarker[part].originalUrl || '' });
     else splitTelegram_(part, limit).filter(Boolean).forEach(text => items.push({ type: 'text', text: telegramTextHtml_(text, links) }));
   });
   return items;
@@ -944,23 +940,6 @@ function telegramSendPhoto_(url, chatIdOverride, fallbackUrl) {
     if (fallbackUrl && fallbackUrl !== url) return sendPhotoUrl_(fallbackUrl);
     throw error;
   }
-}
-
-function telegramSendTransparentPng_(url, chatIdOverride) {
-  const props = PropertiesService.getScriptProperties();
-  const token = requireProperty_(props, PROP.telegramToken);
-  const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
-  const source = fetchWithRetry_(String(url || ''), { muteHttpExceptions: true }, 'Transparent newsletter image');
-  if (source.getResponseCode() < 200 || source.getResponseCode() >= 300) throw new Error('The transparent newsletter image could not be downloaded.');
-  const png = source.getBlob().setContentType('image/png').setName('newsletter-image.png');
-  const response = fetchWithRetry_('https://api.telegram.org/bot' + token + '/sendDocument', {
-    method: 'post',
-    payload: { chat_id: chatId, document: png },
-    muteHttpExceptions: true
-  }, 'Telegram transparent image');
-  const data = JSON.parse(response.getContentText());
-  if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm transparent image publication.');
-  return data.result;
 }
 
 function telegramSend_(text, chatIdOverride) {

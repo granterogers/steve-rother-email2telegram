@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.1**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.2**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -168,7 +168,7 @@ When deploying manually:
 - Model: dashboard **Gemini model** or `CONFIG.model`.
 - Formatting: `rewriteWithGemini_`, `buildTelegramRichHtml_`, and `Index.html` preview renderer.
 - Link behavior: `htmlToImageAwareText_`, `ensureLinkMarkers_`, `richTextWithLinks_`, and `expandLinkMarkers_`.
-- Image behavior: `newsletterImageFromTag_`, `ensureImageMarkers_`, and Telegram rich/fallback builders.
+- Image behavior: `newsletterImageFromTag_`, `ensureImageMarkers_`, and Telegram rich/fallback builders. Circular (square-ish, 300 px+) images are cut to an 800 px white-backed JPEG by `circularTransparentImageUrl_` and sent like any other photo, so they stay inline in the rich message. Earlier builds sent them as 2 MB PNG attachments and forced the post into the ordered fallback; that path has been removed.
 - Schedule: once daily around 9am London time, configured in `installHourlyTrigger`; reinstall the trigger after changing it.
 
 ## Verification already completed

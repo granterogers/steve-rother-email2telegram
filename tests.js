@@ -60,7 +60,9 @@ const circularImage = sandbox.htmlToImageAwareText_('<img src="https://cdn.examp
 assert.strictEqual(circularImage.images[0].circular, true);
 assert.strictEqual(circularImage.images[0].originalUrl, 'https://cdn.example.org/oracle.jpg');
 assert(circularImage.images[0].url.includes('mask=circle'));
-assert(circularImage.images[0].url.includes('output=png'));
+assert(circularImage.images[0].url.includes('output=jpg'));
+assert(circularImage.images[0].url.includes('bg=ffffff'));
+assert(circularImage.images[0].url.includes('w=800'));
 const fourteenLinksHtml = Array.from({ length: 14 }, (_, i) => `<a href="https://steverother.org/item-${i + 1}">Useful item ${i + 1}</a>`).join('\n');
 const fourteenLinks = sandbox.htmlToImageAwareText_(fourteenLinksHtml, 8, 30);
 assert.strictEqual(fourteenLinks.links.length, 14);
@@ -100,7 +102,7 @@ assert.strictEqual(fallbackItems[1].url, 'https://cdn.example.org/hero.jpg');
 assert.strictEqual(fallbackItems[3].url, 'https://cdn.example.org/second.jpg');
 assert(fallbackItems[4].text.includes('https://steverother.org/event'));
 const transparentItems = sandbox.buildFallbackPublicationItems_('Before\n\n[[IMAGE_1]]\n\nAfter', circularImage.images, 3800, []);
-assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'document', 'text']);
+assert.deepStrictEqual(Array.from(transparentItems, item => item.type), ['text', 'photo', 'text']);
 assert.strictEqual(
   sandbox.normalizeTelegramSpacing_('[[B]]Heading[[/B]]\nParagraph\n[[IMAGE_1]]\nNext'),
   '[[B]]Heading[[/B]]\n\nParagraph\n\n[[IMAGE_1]]\n\nNext'
