@@ -1,6 +1,26 @@
 # Full handover
 
-Updated: 27 October 2026
+Updated: 28 October 2026
+
+## Can another coding agent continue from GitHub alone?
+
+Yes for development, testing, documentation, and automated deployment. The repository contains the complete application source and the deployment workflow. It is deliberately not a backup of private runtime data or credentials.
+
+| Component | In GitHub? | Where it lives / what Claude needs |
+| --- | --- | --- |
+| Apps Script backend | Yes | `Code.gs` |
+| Private dashboard | Yes | `Index.html` |
+| Apps Script manifest and OAuth scopes | Yes | `appsscript.json` |
+| Automated tests | Yes | `tests.js` |
+| Deployment workflow | Yes | `.github/workflows/deploy-apps-script.yml` |
+| Architecture, status and safety rules | Yes | `HANDOVER.md`, `README.md`, `AGENTS.md`, `CLAUDE.md` |
+| Gemini API key | No, intentionally | Apps Script Script Properties |
+| Telegram bot token and private chat IDs | No, intentionally | Apps Script Script Properties |
+| Gmail messages, message IDs and previews | No, intentionally | Gmail and Apps Script private runtime state |
+| Apps Script project/deployment IDs and clasp OAuth | Not in source | Encrypted GitHub Actions secrets |
+| Live/test mode, trigger state and duplicate journals | No, intentionally | Apps Script properties and triggers |
+
+Claude can therefore clone the repository, read `CLAUDE.md`, change and test the code, and push to `main`. With authorized GitHub access, the existing workflow deploys source changes to the existing Apps Script project. To inspect the authenticated dashboard, Gmail samples, Script Properties, Apps Script execution logs, or Telegram results, Claude also needs access to the owner's signed-in browser or the corresponding authorized service—not copied secrets.
 
 ## Outcome and current state
 
@@ -11,7 +31,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Item | Current state |
 | --- | --- |
 | Apps Script project | Created and authenticated as the owner's Google account |
-| Private dashboard | Version 28 deployed automatically to the valid private web-app deployment on 27 October 2026 |
+| Private dashboard | Version 29 deployed automatically to the valid private web-app deployment on 27 October 2026 |
 | Gmail account | Connected through Apps Script authorization |
 | Newsletter sender | `mailmanager@espavo.org` |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
@@ -25,7 +45,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Live mode | Off at last verified state |
 | Scheduled trigger | Off at last verified state |
 
-Version 28 presents testing as three compact tabs: Find & generate, Preview & compare, and Send test. The original email expands beside the Telegram rendering, optional editing is collapsed, spacing is normalized, and circular cut-outs use uncompressed PNG uploads. Telegram bot setup and automatic-publishing explanations are available as in-page help pop-ups. A dedicated Automatic publishing page shows Gmail, Gemini, bot, production destination, controlled-publication, duplicate-prevention, and cloud-trigger readiness. The trigger cannot be installed until the controlled live send and duplicate-prevention rerun have both succeeded.
+Version 29 presents testing as three compact tabs: Find & generate, Preview & compare, and Send test. The original email expands beside the Telegram rendering, optional editing is collapsed, spacing is normalized, and circular cut-outs use uncompressed PNG uploads. Telegram bot setup and automatic-publishing explanations are available as in-page help pop-ups. A dedicated Automatic publishing page shows Gmail, Gemini, bot, production destination, controlled-publication, duplicate-prevention, and cloud-trigger readiness. The trigger cannot be installed until the controlled live send and duplicate-prevention rerun have both succeeded. The configured trigger now runs once daily around 9am London time when enabled.
 
 The next release replaces the source-side text reconstruction with a sandboxed rendering of the actual Gmail HTML. It preserves the newsletter's 640 px card layout, inline colours, spacing, headings, images and styled CTA buttons while removing tracking pixels, scripts and active navigation. Meaningfully labelled MailerLite CTA redirects may be retained as protected links (maximum 12), while raw tracking URLs remain hidden from the post body.
 
@@ -34,9 +54,20 @@ The next release replaces the source-side text reconstruction with a sandboxed r
 - GitHub: <https://github.com/granterogers/steve-rother-email2telegram>
 - The Apps Script project ID, editor URL, private web-app URL, Gmail account, Gmail message IDs, Telegram destination ID, and credentials are deliberately retained only in the owner's private Google configuration.
 
-The valid owner-only web-app deployment serves Apps Script Version 28. GitHub Actions now pushes source, creates a version, and updates this deployment automatically when Apps Script source changes on `main`. The manifest explicitly retains the private web-app entry point. A separate historical deployment without a web-app entry point was mistakenly updated to Version 19 and must not be used as the production deployment target.
+The valid owner-only web-app deployment serves Apps Script Version 29. GitHub Actions pushes source, creates a version, and updates this deployment automatically when Apps Script source changes on `main`. The manifest explicitly retains the private web-app entry point. A separate historical deployment without a web-app entry point was mistakenly updated to Version 19 and must not be used as the production deployment target.
 
 ## Architecture
+
+```mermaid
+flowchart TD
+    A["Daily Apps Script trigger"] --> B["Strict Gmail Inbox match"]
+    B --> C["Extract text, links and images"]
+    C --> D["Gemini rewrite with protected markers"]
+    D --> E["Telegram publication"]
+    E --> F{"Every Telegram item confirmed?"}
+    F -- No --> G["Keep Gmail unprocessed; retry safely"]
+    F -- Yes --> H["Record journal and label Gmail processed"]
+```
 
 1. A once-daily Apps Script trigger calls `scheduledRun` around 9am London time when enabled.
 2. Gmail candidates come from a narrow sender query.
@@ -150,7 +181,7 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 
 ## Known remaining work
 
-- Regenerate a preview in Version 28 and use the Automatic publishing page to perform the controlled production send, duplicate-prevention check, and trigger installation when the final output and production destination are approved.
+- Regenerate a preview in Version 29 and use the Automatic publishing page to perform the controlled production send, duplicate-prevention check, and trigger installation when the final output and production destination are approved.
 - The faithful original-email rendering and editable rich Telegram preview were visually verified side by side for that sample.
 - Choose a test-only Telegram destination and inspect both individual and send-all rendering.
 - Perform the one-item controlled production test only after editorial approval.

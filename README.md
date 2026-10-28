@@ -15,6 +15,7 @@ The production path is fail-closed. `LIVE_MODE` must be `true`; the controlled f
 | `appsscript.json` | Apps Script runtime, timezone, and OAuth scopes |
 | `tests.js` | Local tests for cleaning, image/link preservation, rich HTML, fallback ordering, chunking, and idempotency helpers |
 | `HANDOVER.md` | Current deployment state, exact continuation plan, safety gates, and maintenance notes |
+| `CLAUDE.md` | Fast entry point and operating rules for continuing development in Claude Code |
 | `AGENTS.md` | Guardrails for future implementation agents |
 
 ## Required Script Properties
