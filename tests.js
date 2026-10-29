@@ -190,7 +190,8 @@ assert.strictEqual((fidelityHtml.match(/Second paragraph after the circle/g) || 
   return at;
 }, -1);
 assert(fidelityHtml.includes('<a href="https://steverother.org/event">'));
-assert(fidelityHtml.includes('<p><b> Walking Each Other Home </b></p><p>'), 'heading must be its own paragraph');
+assert(fidelityHtml.includes('<b> Walking Each Other Home </b><br><br>A <b> warm </b>'), 'blank line after heading must be carried across');
+assert(!fidelityHtml.includes('<p>'), 'rich post must carry blank lines as explicit breaks');
 const fidelityItems = sandbox.buildFallbackPublicationItems_(fidelityPost, fidelityExtract.images, 3800, fidelityExtract.links);
 assert.deepStrictEqual(fidelityItems.filter(item => item.type !== 'text').map(item => item.url), fidelityExtract.images.map(image => image.url));
 assert(!/\[\[(?:IMAGE|LINK)_\d+\]\]/.test(fidelityHtml + JSON.stringify(fidelityItems)));

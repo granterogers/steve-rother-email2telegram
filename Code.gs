@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 
 
 const CONFIG = Object.freeze({
@@ -876,7 +876,7 @@ function buildTelegramRichHtml_(post, images, links) {
     if (image) return '<img src="' + escapeHtml_(image.url) + '"/>';
     // A heading that is alone on its line stays its own paragraph, as in the email.
     return part.replace(/(\[\[B\]\][^\n]*\[\[\/B\]\])\n/g, '$1\n\n').split(/\n{2,}/).map(paragraph => paragraph.trim()).filter(Boolean)
-      .map(paragraph => '<p>' + richTextWithLinks_(paragraph, links).replace(/\n/g, '<br>') + '</p>').join('');
+      .map(paragraph => richTextWithLinks_(paragraph, links).replace(/\n/g, '<br>')).join('<br><br>');
   }).join('');
 }
 
