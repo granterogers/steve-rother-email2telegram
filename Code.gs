@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.7';
+const APP_VERSION = '1.0.8';
 
 
 const CONFIG = Object.freeze({
@@ -36,6 +36,7 @@ const PROP = Object.freeze({
   geminiKey: 'GEMINI_API_KEY',
   telegramToken: 'TELEGRAM_BOT_TOKEN',
   telegramChatId: 'TELEGRAM_CHAT_ID',
+  telegramThreadId: 'TELEGRAM_THREAD_ID',
   testTelegramChatId: 'TEST_TELEGRAM_CHAT_ID',
   testMessageId: 'TEST_MESSAGE_ID',
   liveMode: 'LIVE_MODE',
@@ -859,7 +860,7 @@ function telegramTrySendRich_(post, images, links, chatIdOverride) {
   const chatId = String(chatIdOverride || requireProperty_(props, PROP.telegramChatId));
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendRichMessage', {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ chat_id: chatId, rich_message: { html: buildTelegramRichHtml_(post, images, links) } })
+    payload: JSON.stringify(Object.assign({ chat_id: chatId, rich_message: { html: buildTelegramRichHtml_(post, images, links) } }, telegramTopicOptions_(chatIdOverride)))
   });
   const code = response.getResponseCode();
   const data = parseJson_(response.getContentText()) || {};
@@ -928,7 +929,7 @@ function telegramSendPhoto_(url, chatIdOverride, fallbackUrl) {
   function sendPhotoUrl_(photoUrl) {
     const response = fetchWithRetry_('https://api.telegram.org/bot' + token + '/sendPhoto', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-      payload: JSON.stringify({ chat_id: chatId, photo: photoUrl })
+      payload: JSON.stringify(Object.assign({ chat_id: chatId, photo: photoUrl }, telegramTopicOptions_(chatIdOverride)))
     }, 'Telegram');
     const data = JSON.parse(response.getContentText());
     if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm image publication.');
@@ -942,6 +943,14 @@ function telegramSendPhoto_(url, chatIdOverride, fallbackUrl) {
   }
 }
 
+// Optional forum topic for the production group. Test destinations never use it,
+// and the General topic (1) is omitted because Telegram rejects it as a thread.
+function telegramTopicOptions_(chatIdOverride) {
+  if (chatIdOverride) return {};
+  const threadId = Number(PropertiesService.getScriptProperties().getProperty(PROP.telegramThreadId) || 0);
+  return threadId > 1 ? { message_thread_id: threadId } : {};
+}
+
 function telegramSend_(text, chatIdOverride) {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
@@ -949,7 +958,7 @@ function telegramSend_(text, chatIdOverride) {
   const url = 'https://api.telegram.org/bot' + token + '/sendMessage';
   const response = fetchWithRetry_(url, {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    payload: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true })
+    payload: JSON.stringify(Object.assign({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true }, telegramTopicOptions_(chatIdOverride)))
   }, 'Telegram');
   const data = JSON.parse(response.getContentText());
   if (!data.ok || !data.result || !data.result.message_id) throw new Error('Telegram did not confirm publication.');

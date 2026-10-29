@@ -196,4 +196,13 @@ const fidelityItems = sandbox.buildFallbackPublicationItems_(fidelityPost, fidel
 assert.deepStrictEqual(fidelityItems.filter(item => item.type !== 'text').map(item => item.url), fidelityExtract.images.map(image => image.url));
 assert(!/\[\[(?:IMAGE|LINK)_\d+\]\]/.test(fidelityHtml + JSON.stringify(fidelityItems)));
 
+// Forum topics: production posts go to TELEGRAM_THREAD_ID when it names a topic.
+sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: key => ({ TELEGRAM_THREAD_ID: '42' })[key] || null }) };
+assert.strictEqual(JSON.stringify(sandbox.telegramTopicOptions_()), JSON.stringify({ message_thread_id: 42 }));
+assert.strictEqual(JSON.stringify(sandbox.telegramTopicOptions_('-100test')), '{}', 'test destinations never use the production topic');
+sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: key => ({ TELEGRAM_THREAD_ID: '1' })[key] || null }) };
+assert.strictEqual(JSON.stringify(sandbox.telegramTopicOptions_()), '{}', 'the General topic must not be sent as a thread');
+sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: () => null }) };
+assert.strictEqual(JSON.stringify(sandbox.telegramTopicOptions_()), '{}', 'no topic configured leaves posting unchanged');
+
 console.log('All local helper tests passed.');
