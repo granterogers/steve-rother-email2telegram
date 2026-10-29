@@ -205,4 +205,14 @@ assert.strictEqual(JSON.stringify(sandbox.telegramTopicOptions_()), '{}', 'the G
 sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: () => null }) };
 assert.strictEqual(JSON.stringify(sandbox.telegramTopicOptions_()), '{}', 'no topic configured leaves posting unchanged');
 
+// Production topic input: message links from inside a topic, or a bare topic number.
+assert.strictEqual(sandbox.parseTelegramTopicInput_('https://t.me/steve_rother_community/1/279'), 1);
+assert.strictEqual(sandbox.parseTelegramTopicInput_('t.me/steve_rother_community/12/345'), 12);
+assert.strictEqual(sandbox.parseTelegramTopicInput_('https://t.me/c/1234567890/42/900?single'), 42);
+assert.strictEqual(sandbox.parseTelegramTopicInput_(' 42 '), 42);
+assert.strictEqual(sandbox.parseTelegramTopicInput_(''), 0);
+assert.throws(() => sandbox.parseTelegramTopicInput_('https://t.me/c/1234567890/900'), /no topic/);
+assert.throws(() => sandbox.parseTelegramTopicInput_('https://t.me/steve_rother_community/279'), /Paste a link/);
+assert.throws(() => sandbox.parseTelegramTopicInput_('hello'), /Paste a link/);
+
 console.log('All local helper tests passed.');

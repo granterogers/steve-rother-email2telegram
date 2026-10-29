@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.0.9';
 
 
 const CONFIG = Object.freeze({
@@ -69,6 +69,7 @@ function getDashboardState() {
       geminiConfigured: Boolean(props.getProperty(PROP.geminiKey)),
       telegramConfigured: Boolean(props.getProperty(PROP.telegramToken)),
       destinationConfigured: Boolean(props.getProperty(PROP.telegramChatId)),
+      productionTopic: Number(props.getProperty(PROP.telegramThreadId) || 0),
       liveMode: props.getProperty(PROP.liveMode) === 'true',
       triggerInstalled: ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'scheduledRun'),
       liveReason: props.getProperty(PROP.liveMode) === 'true'
@@ -298,6 +299,28 @@ function getTelegramBotSetupInfo() {
       'For a public channel you may instead enter its @channelusername; private destinations use their numeric ID.'
     ]
   };
+}
+
+// Accepts a message link from inside a forum topic (t.me/group/TOPIC/MESSAGE or
+// t.me/c/GROUP/TOPIC/MESSAGE), or a bare topic number. Blank clears the setting.
+function saveDashboardProductionTopic(value) {
+  const topic = parseTelegramTopicInput_(value);
+  const props = PropertiesService.getScriptProperties();
+  if (topic) props.setProperty(PROP.telegramThreadId, String(topic));
+  else props.deleteProperty(PROP.telegramThreadId);
+  return { topic: topic };
+}
+
+function parseTelegramTopicInput_(value) {
+  const text = String(value || '').trim();
+  if (!text) return 0;
+  if (/^\d+$/.test(text)) return Number(text);
+  if (/^(?:https?:\/\/)?t\.me\/c\/\d+\/\d+\/?(?:[?#]\S*)?$/i.test(text)) {
+    throw new Error('That link points to a message with no topic. Paste a link to a message inside the topic.');
+  }
+  const link = text.match(/^(?:https?:\/\/)?t\.me\/(?:c\/\d+|[A-Za-z0-9_]+)\/(\d+)\/\d+\/?(?:[?#]\S*)?$/i);
+  if (link) return Number(link[1]);
+  throw new Error('Paste a link to a message inside the topic (t.me/group/topic/message), or the topic number.');
 }
 
 function saveDashboardTestDestination(chatId) {
