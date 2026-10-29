@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.9**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.10**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -107,7 +107,7 @@ Manage these under **Apps Script → Project Settings → Script properties** or
 | `TELEGRAM_BOT_TOKEN` | Existing BotFather token; never commit it |
 | `TELEGRAM_CHAT_ID` | Numeric test group/channel ID; never commit it in this public repository |
 | `TEST_TELEGRAM_CHAT_ID` | Optional test-only group/channel ID; changing it does not alter production |
-| `TELEGRAM_THREAD_ID` | Optional forum topic ID inside the production group. Set it in **Connections → Production topic** by pasting a message link from the topic (for example `t.me/group/TOPIC/MESSAGE`) or the topic number. Blank or `1` (General) posts to the group itself. Production posts only; never used for test destinations |
+| `TELEGRAM_THREAD_ID` | Optional forum topic ID inside the production group. Set it in **Connections → Production topic**: press **Find topics in group** and choose from the list, or paste a message link from the topic (`t.me/group/TOPIC/MESSAGE`). The list comes from recent bot updates, so the bot must be an admin and each topic needs one message first. Blank or `1` (General) posts to the group itself. Production posts only; never used for test destinations |
 | `TEST_MESSAGE_ID` | The privately selected historical Gmail message ID |
 | `LIVE_MODE` | Keep `false` until the controlled publication is approved |
 | `LIVE_APPROVED_MESSAGE_ID` | Blank except during the one-item controlled release |

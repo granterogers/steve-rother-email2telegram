@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.9';
+const APP_VERSION = '1.0.10';
 
 
 const CONFIG = Object.freeze({
@@ -254,6 +254,34 @@ function validateConfiguration() {
   if (report.geminiKeyPresent) report.geminiModel = validateGemini_();
   console.log(JSON.stringify(report, null, 2));
   return report;
+}
+
+// Lists the forum topics the bot has seen in the production group. Telegram has no
+// call that lists topics, so this reads recent updates: topic creation and rename
+// service messages, and any message posted inside a topic. Telegram keeps updates
+// for about a day, so a quiet topic may need one message before it appears.
+function discoverProductionTopics(chatId) {
+  const props = PropertiesService.getScriptProperties();
+  const token = requireProperty_(props, PROP.telegramToken);
+  const target = String(chatId || props.getProperty(PROP.telegramChatId) || '').trim();
+  if (!target) throw new Error('Choose the production group first.');
+  const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates?limit=100&timeout=0', {
+    muteHttpExceptions: true
+  });
+  const data = JSON.parse(response.getContentText());
+  if (!data.ok) throw new Error('Telegram topic discovery failed.' + (data.description ? ' ' + data.description : ''));
+  const names = { '1': 'General' };
+  (data.result || []).forEach(update => {
+    const message = update.message || update.channel_post;
+    if (!message || !message.chat) return;
+    const inGroup = String(message.chat.id) === target || ('@' + message.chat.username) === target;
+    const thread = Number(message.message_thread_id || 0);
+    if (!inGroup || thread < 1) return;
+    const named = message.forum_topic_created || message.forum_topic_edited;
+    if (named && named.name) names[String(thread)] = named.name;
+    else if (!names[String(thread)]) names[String(thread)] = 'Topic ' + thread;
+  });
+  return Object.keys(names).map(id => ({ id: Number(id), name: names[id] })).sort((a, b) => a.id - b.id);
 }
 
 function discoverTelegramChats() {

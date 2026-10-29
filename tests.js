@@ -215,4 +215,15 @@ assert.throws(() => sandbox.parseTelegramTopicInput_('https://t.me/c/1234567890/
 assert.throws(() => sandbox.parseTelegramTopicInput_('https://t.me/steve_rother_community/279'), /Paste a link/);
 assert.throws(() => sandbox.parseTelegramTopicInput_('hello'), /Paste a link/);
 
+// Topic discovery reads recent updates for the production group only.
+sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: key => ({ TELEGRAM_BOT_TOKEN: 'token', TELEGRAM_CHAT_ID: '-100123' })[key] || null }) };
+sandbox.UrlFetchApp = { fetch: () => ({ getResponseCode: () => 200, getContentText: () => JSON.stringify({ ok: true, result: [
+  { message: { chat: { id: -100123 }, message_thread_id: 5, forum_topic_created: { name: 'Oracle' } } },
+  { message: { chat: { id: -100123 }, message_thread_id: 5 } },
+  { message: { chat: { id: -100123 }, message_thread_id: 9 } },
+  { message: { chat: { id: -999 }, message_thread_id: 7, forum_topic_created: { name: 'Other group' } } },
+  { message: { chat: { id: -100123 } } }
+] }) }) };
+assert.strictEqual(JSON.stringify(sandbox.discoverProductionTopics()), JSON.stringify([{ id: 1, name: 'General' }, { id: 5, name: 'Oracle' }, { id: 9, name: 'Topic 9' }]));
+
 console.log('All local helper tests passed.');
