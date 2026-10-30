@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.11';
+const APP_VERSION = '1.0.12';
 
 
 const CONFIG = Object.freeze({
@@ -317,8 +317,8 @@ function getTelegramBotSetupInfo() {
     name: bot.name || '',
     instructions: [
       'Open the group in Telegram, tap its name, and choose Add members.',
-      'Add ' + handle + ' and make it an administrator.',
-      'Send any message in the group. If the group has topics, send one message in each topic.',
+      'Add ' + handle + '. It does not need to be an administrator to post.',
+      'In the group, send /start@' + (bot.username || 'steve_newsletter_bot') + '. If the group has topics, send it inside each topic.',
       'Come back here and press Refresh my groups.'
     ]
   };
