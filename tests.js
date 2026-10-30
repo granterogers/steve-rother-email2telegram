@@ -237,4 +237,23 @@ liveUpdates = [];
 assert.strictEqual(JSON.stringify(sandbox.discoverProductionTopics()), JSON.stringify([{ id: 1, name: 'General' }, { id: 5, name: 'Oracle' }, { id: 9, name: 'Topic 9' }]), 'topics must survive when Telegram returns no updates');
 assert.strictEqual(sandbox.discoverTelegramChats().length, 2, 'groups must survive when Telegram returns no updates');
 
+// Diagnosis explains the most likely reason a group is missing.
+let webhookUrl = '';
+let diagnosisUpdates = [];
+sandbox.UrlFetchApp = { fetch: url => {
+  const body = url.includes('/getMe') ? { ok: true, result: { id: 1, username: 'steve_newsletter_bot', first_name: 'Steve' } }
+    : url.includes('/getWebhookInfo') ? { ok: true, result: { url: webhookUrl } }
+    : { ok: true, result: diagnosisUpdates };
+  return { getResponseCode: () => 200, getContentText: () => JSON.stringify(body) };
+} };
+webhookUrl = 'https://example.org/hook';
+assert(sandbox.diagnoseTelegramUpdates().includes('a webhook is set'));
+webhookUrl = '';
+diagnosisUpdates = [];
+assert(sandbox.diagnoseTelegramUpdates().includes('/start@steve_newsletter_bot'));
+diagnosisUpdates = [{ message: { chat: { id: -100777, type: 'supergroup', title: 'Espavo Team' }, text: '/start@steve_newsletter_bot' } }];
+const diagnosed = sandbox.diagnoseTelegramUpdates();
+assert(diagnosed.includes('Espavo Team (supergroup)'));
+assert(diagnosed.includes('Groups saved in the dashboard list: 3'), 'saved groups must include the groups seen earlier in the tests');
+
 console.log('All local helper tests passed.');

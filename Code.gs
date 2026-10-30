@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.12';
+const APP_VERSION = '1.0.13';
 
 
 const CONFIG = Object.freeze({
@@ -307,6 +307,36 @@ function discoverProductionTopics(chatId) {
   if (!target) throw new Error('Choose the live group first.');
   const names = Object.assign({ '1': 'General' }, registry.topics[target] || {});
   return Object.keys(names).map(id => ({ id: Number(id), name: names[id] })).sort((a, b) => a.id - b.id);
+}
+
+// Read-only check of what Telegram is holding for the bot. It names the most likely
+// reason when no group appears: a webhook that blocks updates, or no group messages.
+function diagnoseTelegramUpdates() {
+  const token = requireProperty_(PropertiesService.getScriptProperties(), PROP.telegramToken);
+  const bot = telegramGetMe_();
+  const hook = JSON.parse(UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getWebhookInfo', { muteHttpExceptions: true }).getContentText());
+  const updates = JSON.parse(UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates?limit=100&timeout=0', { muteHttpExceptions: true }).getContentText());
+  const lines = ['Bot: @' + bot.username];
+  if (hook.ok && hook.result && hook.result.url) {
+    lines.push('Problem: a webhook is set for this bot, so Telegram does not hold updates for this check. Remove the webhook, then check again.');
+    return lines.join('\n');
+  }
+  if (!updates.ok) {
+    lines.push('Problem: Telegram returned an error: ' + (updates.description || 'unknown error'));
+    return lines.join('\n');
+  }
+  const groupMessages = (updates.result || []).map(update => update.message || update.channel_post || update.my_chat_member)
+    .filter(item => item && item.chat && ['group', 'supergroup', 'channel'].includes(item.chat.type));
+  const titles = {};
+  groupMessages.forEach(item => { titles[item.chat.title || String(item.chat.id)] = item.chat.type; });
+  lines.push('Messages Telegram still holds: ' + (updates.result || []).length + ' (Telegram keeps them for about a day).');
+  lines.push('Group or topic activity held: ' + groupMessages.length + '.');
+  Object.keys(titles).forEach(title => lines.push('  • ' + title + ' (' + titles[title] + ')'));
+  if (!groupMessages.length) lines.push('Next step: send /start@' + bot.username + ' in each group (inside each topic, if the group has topics), then press Check again.');
+  refreshTelegramRegistry_();
+  const saved = Object.keys(parseJson_(PropertiesService.getScriptProperties().getProperty(PROP.telegramRegistry)).chats || {}).length;
+  lines.push('Groups saved in the dashboard list: ' + saved + '.');
+  return lines.join('\n');
 }
 
 function getTelegramBotSetupInfo() {
