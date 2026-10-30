@@ -215,15 +215,26 @@ assert.throws(() => sandbox.parseTelegramTopicInput_('https://t.me/c/1234567890/
 assert.throws(() => sandbox.parseTelegramTopicInput_('https://t.me/steve_rother_community/279'), /Paste a link/);
 assert.throws(() => sandbox.parseTelegramTopicInput_('hello'), /Paste a link/);
 
-// Topic discovery reads recent updates for the production group only.
-sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: key => ({ TELEGRAM_BOT_TOKEN: 'token', TELEGRAM_CHAT_ID: '-100123' })[key] || null }) };
-sandbox.UrlFetchApp = { fetch: () => ({ getResponseCode: () => 200, getContentText: () => JSON.stringify({ ok: true, result: [
-  { message: { chat: { id: -100123 }, message_thread_id: 5, forum_topic_created: { name: 'Oracle' } } },
-  { message: { chat: { id: -100123 }, message_thread_id: 5 } },
-  { message: { chat: { id: -100123 }, message_thread_id: 9 } },
-  { message: { chat: { id: -999 }, message_thread_id: 7, forum_topic_created: { name: 'Other group' } } },
-  { message: { chat: { id: -100123 } } }
-] }) }) };
+// Discovery saves groups and topics, so names survive after Telegram's updates expire.
+const savedProps = { TELEGRAM_BOT_TOKEN: 'token', TELEGRAM_CHAT_ID: '-100123' };
+sandbox.PropertiesService = { getScriptProperties: () => ({
+  getProperty: key => savedProps[key] || null,
+  setProperty: (key, value) => { savedProps[key] = value; },
+  deleteProperty: key => { delete savedProps[key]; }
+}) };
+let liveUpdates = [
+  { my_chat_member: { chat: { id: -100123, type: 'supergroup', title: 'Steve Rother Community' } } },
+  { message: { chat: { id: -100123, type: 'supergroup', title: 'Steve Rother Community' }, message_thread_id: 5, forum_topic_created: { name: 'Oracle' } } },
+  { message: { chat: { id: -100123, type: 'supergroup', title: 'Steve Rother Community' }, message_thread_id: 5 } },
+  { message: { chat: { id: -100123, type: 'supergroup', title: 'Steve Rother Community' }, message_thread_id: 9 } },
+  { message: { chat: { id: -555, type: 'supergroup', title: 'Steve test group' } } },
+  { message: { chat: { id: -999, type: 'private', title: undefined } } }
+];
+sandbox.UrlFetchApp = { fetch: () => ({ getResponseCode: () => 200, getContentText: () => JSON.stringify({ ok: true, result: liveUpdates }) }) };
 assert.strictEqual(JSON.stringify(sandbox.discoverProductionTopics()), JSON.stringify([{ id: 1, name: 'General' }, { id: 5, name: 'Oracle' }, { id: 9, name: 'Topic 9' }]));
+assert.strictEqual(JSON.stringify(sandbox.discoverTelegramChats().map(chat => chat.title)), JSON.stringify(['Steve Rother Community', 'Steve test group']));
+liveUpdates = [];
+assert.strictEqual(JSON.stringify(sandbox.discoverProductionTopics()), JSON.stringify([{ id: 1, name: 'General' }, { id: 5, name: 'Oracle' }, { id: 9, name: 'Topic 9' }]), 'topics must survive when Telegram returns no updates');
+assert.strictEqual(sandbox.discoverTelegramChats().length, 2, 'groups must survive when Telegram returns no updates');
 
 console.log('All local helper tests passed.');

@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.10';
+const APP_VERSION = '1.0.11';
 
 
 const CONFIG = Object.freeze({
@@ -37,6 +37,7 @@ const PROP = Object.freeze({
   telegramToken: 'TELEGRAM_BOT_TOKEN',
   telegramChatId: 'TELEGRAM_CHAT_ID',
   telegramThreadId: 'TELEGRAM_THREAD_ID',
+  telegramRegistry: 'TELEGRAM_REGISTRY',
   testTelegramChatId: 'TEST_TELEGRAM_CHAT_ID',
   testMessageId: 'TEST_MESSAGE_ID',
   liveMode: 'LIVE_MODE',
@@ -256,75 +257,69 @@ function validateConfiguration() {
   return report;
 }
 
-// Lists the forum topics the bot has seen in the production group. Telegram has no
-// call that lists topics, so this reads recent updates: topic creation and rename
-// service messages, and any message posted inside a topic. Telegram keeps updates
-// for about a day, so a quiet topic may need one message before it appears.
-function discoverProductionTopics(chatId) {
+// Groups and forum topics the bot has seen are saved in TELEGRAM_REGISTRY. Telegram only
+// shows recent updates (about a day), so saving them is what keeps names available later.
+function refreshTelegramRegistry_() {
   const props = PropertiesService.getScriptProperties();
   const token = requireProperty_(props, PROP.telegramToken);
-  const target = String(chatId || props.getProperty(PROP.telegramChatId) || '').trim();
-  if (!target) throw new Error('Choose the production group first.');
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates?limit=100&timeout=0', {
     muteHttpExceptions: true
   });
   const data = JSON.parse(response.getContentText());
-  if (!data.ok) throw new Error('Telegram topic discovery failed.' + (data.description ? ' ' + data.description : ''));
-  const names = { '1': 'General' };
+  if (!data.ok) throw new Error('Telegram could not list recent updates.' + (data.description ? ' ' + data.description : ''));
+  const registry = parseJson_(props.getProperty(PROP.telegramRegistry)) || { chats: {}, topics: {} };
   (data.result || []).forEach(update => {
     const message = update.message || update.channel_post;
-    if (!message || !message.chat) return;
-    const inGroup = String(message.chat.id) === target || ('@' + message.chat.username) === target;
-    const thread = Number(message.message_thread_id || 0);
-    if (!inGroup || thread < 1) return;
-    const named = message.forum_topic_created || message.forum_topic_edited;
-    if (named && named.name) names[String(thread)] = named.name;
-    else if (!names[String(thread)]) names[String(thread)] = 'Topic ' + thread;
-  });
-  return Object.keys(names).map(id => ({ id: Number(id), name: names[id] })).sort((a, b) => a.id - b.id);
-}
-
-function discoverTelegramChats() {
-  const token = requireProperty_(PropertiesService.getScriptProperties(), PROP.telegramToken);
-  const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getUpdates?limit=100&timeout=0', {
-    muteHttpExceptions: true
-  });
-  const data = JSON.parse(response.getContentText());
-  if (!data.ok) {
-    const detail = data.description ? ' ' + data.description : '';
-    throw new Error('Telegram chat discovery failed.' + detail);
-  }
-  const chats = {};
-  (data.result || []).forEach(update => {
-    const candidates = [
-      update.message && update.message.chat,
-      update.channel_post && update.channel_post.chat,
+    const chats = [
+      message && message.chat,
       update.my_chat_member && update.my_chat_member.chat,
       update.chat_member && update.chat_member.chat
     ];
-    candidates.filter(Boolean).forEach(chat => {
-      if (!['group', 'supergroup', 'channel'].includes(chat.type)) return;
-      chats[String(chat.id)] = {
+    chats.filter(chat => chat && ['group', 'supergroup', 'channel'].includes(chat.type)).forEach(chat => {
+      registry.chats[String(chat.id)] = {
         id: String(chat.id),
         type: chat.type,
-        title: chat.title || (chat.username ? '@' + chat.username : 'Untitled Telegram chat')
+        title: chat.title || (chat.username ? '@' + chat.username : 'Untitled group')
       };
     });
+    const thread = Number((message && message.message_thread_id) || 0);
+    if (!message || !message.chat || thread < 1) return;
+    const key = String(message.chat.id);
+    registry.topics[key] = registry.topics[key] || {};
+    const named = message.forum_topic_created || message.forum_topic_edited;
+    if (named && named.name) registry.topics[key][String(thread)] = named.name;
+    else if (!registry.topics[key][String(thread)]) registry.topics[key][String(thread)] = 'Topic ' + thread;
   });
-  const result = Object.keys(chats).map(id => chats[id]).sort((a, b) => a.title.localeCompare(b.title));
-  return result;
+  props.setProperty(PROP.telegramRegistry, JSON.stringify(registry));
+  return registry;
+}
+
+function discoverTelegramChats() {
+  const registry = refreshTelegramRegistry_();
+  return Object.keys(registry.chats).map(id => registry.chats[id]).sort((a, b) => a.title.localeCompare(b.title));
+}
+
+// Topics for one group, with General always first. Topic 1 is the General topic.
+function discoverProductionTopics(chatId) {
+  const props = PropertiesService.getScriptProperties();
+  const registry = refreshTelegramRegistry_();
+  const target = String(chatId || props.getProperty(PROP.telegramChatId) || '').trim();
+  if (!target) throw new Error('Choose the live group first.');
+  const names = Object.assign({ '1': 'General' }, registry.topics[target] || {});
+  return Object.keys(names).map(id => ({ id: Number(id), name: names[id] })).sort((a, b) => a.id - b.id);
 }
 
 function getTelegramBotSetupInfo() {
   const bot = telegramGetMe_();
+  const handle = bot.username ? '@' + bot.username : 'the bot';
   return {
     username: bot.username ? '@' + bot.username : '',
     name: bot.name || '',
     instructions: [
-      'Add the bot to the Telegram group, or make it an administrator in a channel.',
-      'In a group, send /connect so Telegram exposes that group to the bot.',
-      'Return here and press Refresh available groups.',
-      'For a public channel you may instead enter its @channelusername; private destinations use their numeric ID.'
+      'Open the group in Telegram, tap its name, and choose Add members.',
+      'Add ' + handle + ' and make it an administrator.',
+      'Send any message in the group. If the group has topics, send one message in each topic.',
+      'Come back here and press Refresh my groups.'
     ]
   };
 }
