@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.13';
+const APP_VERSION = '1.0.14';
 
 
 const CONFIG = Object.freeze({

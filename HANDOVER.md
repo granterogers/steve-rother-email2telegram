@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.13**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.14**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -197,3 +197,25 @@ Those tests cover boilerplate cleanup, labelled redirect preservation, useful-li
 - Install the once-daily trigger only after the controlled publication passes.
 
 Until those items are complete, the system should remain in TEST MODE with no production trigger.
+
+## Version history
+
+Every change bumps `APP_VERSION` and adds a line here.
+
+| Version | Change |
+| --- | --- |
+| 1.0.0 | Baseline before the version display was added. |
+| 1.0.1 | Version shown in the dashboard header. |
+| 1.0.2 | Circular images sent as JPEG (later reverted in 1.0.4). |
+| 1.0.3 | Link previews turned off for text messages. |
+| 1.0.4 | Publisher restored to its earlier behaviour; publishing fidelity tests added. |
+| 1.0.5 | Circle mask uses `mbg` so corners are white in JPEG. |
+| 1.0.6 | Circles stay inline in the rich post; a lone bold heading is its own paragraph. |
+| 1.0.7 | Blank lines carried into the rich post. |
+| 1.0.8 | Optional forum topic for live posts (`TELEGRAM_THREAD_ID`). |
+| 1.0.9 | Topic can be set by pasting a message link from the topic. |
+| 1.0.10 | Topic picker lists topics the bot has seen. |
+| 1.0.11 | Groups and topics saved so names persist; simplified group selection. |
+| 1.0.12 | Setup steps corrected: a non-admin bot can post and needs `/start@bot` to be seen. |
+| 1.0.13 | "Check what Telegram can see" read-only diagnostic. |
+| 1.0.14 | Version history added to the handover. |
