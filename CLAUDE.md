@@ -37,7 +37,7 @@ For `Index.html` changes, also validate the inline JavaScript and visually inspe
 - Cloud host: Google Apps Script.
 - Schedule when eventually enabled: once daily, around 9am Europe/London.
 - Source mailbox: the owner's Gmail Inbox only.
-- Strict newsletter sender: `mailmanager@espavo.org`, plus independent bulk-newsletter header checks.
+- Strict newsletter sender: `mailmanager@kjbm.steverother.org`, plus independent bulk-newsletter header checks.
 - Rewrite provider: Gemini.
 - Destination: Telegram via `@steve_newsletter_bot`.
 - Present state: safe test mode; controlled production publication, duplicate verification, and trigger installation remain explicit gates.

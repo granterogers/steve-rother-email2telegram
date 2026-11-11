@@ -33,7 +33,7 @@ The deployed Apps Script project already exists and its secrets remain in Script
 | Apps Script project | Created and authenticated as the owner's Google account |
 | Private dashboard | Version 29 deployed automatically to the valid private web-app deployment on 27 October 2026 |
 | Gmail account | Connected through Apps Script authorization |
-| Newsletter sender | `mailmanager@espavo.org` |
+| Newsletter sender | `mailmanager@kjbm.steverother.org` (fixed in code; saved dashboard values are ignored for now) |
 | Historical sample | Configured privately in `TEST_MESSAGE_ID` |
 | Telegram bot | `@steve_newsletter_bot` |
 | Telegram destination | Test group configured in Script Properties; numeric ID deliberately excluded from this public repository |
@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.14**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.15**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -219,3 +219,4 @@ Every change bumps `APP_VERSION` and adds a line here.
 | 1.0.12 | Setup steps corrected: a non-admin bot can post and needs `/start@bot` to be seen. |
 | 1.0.13 | "Check what Telegram can see" read-only diagnostic. |
 | 1.0.14 | Version history added to the handover. |
+| 1.0.15 | Newsletter sender changed to `mailmanager@kjbm.steverother.org` (fixed in code). DKIM accepts that subdomain or its parent `steverother.org`. Counters such as "Day 12 of 30" or a lone "#12" are removed before rewriting. |

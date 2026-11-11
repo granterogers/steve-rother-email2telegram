@@ -256,4 +256,36 @@ const diagnosed = sandbox.diagnoseTelegramUpdates();
 assert(diagnosed.includes('Espavo Team (supergroup)'));
 assert(diagnosed.includes('Groups saved in the dashboard list: 3'), 'saved groups must include the groups seen earlier in the tests');
 
+// Sender rules: the newsletter comes from the subdomain, and DKIM may come from the owner's domains.
+sandbox.PropertiesService = { getScriptProperties: () => ({ getProperty: () => null }) };
+const newsletterHeaders = (from, dkim) => ({
+  from,
+  raw: [
+    'From: ' + from,
+    'Precedence: bulk',
+    'List-Unsubscribe: <https://click.mlsend.com/unsub>',
+    'Feedback-ID: 1:2:3:mailerlite',
+    'Message-ID: <abc@mlsend.com>',
+    dkim,
+    'Content-Type: multipart/alternative; boundary="b"',
+    '',
+    'body'
+  ].join('\r\n')
+});
+const message = headers => ({ getFrom: () => headers.from, getRawContent: () => headers.raw });
+const newsletterFrom = 'SteveRother.org <mailmanager@kjbm.steverother.org>';
+assert.strictEqual(sandbox.isNewsletter_(message(newsletterHeaders(newsletterFrom, 'DKIM-Signature: v=1; d=kjbm.steverother.org; s=x'))), true, 'new subdomain sender must pass');
+assert.strictEqual(sandbox.isNewsletter_(message(newsletterHeaders(newsletterFrom, 'DKIM-Signature: v=1; d=steverother.org; s=x'))), true, 'parent-domain DKIM must pass');
+assert.strictEqual(sandbox.isNewsletter_(message(newsletterHeaders('mailmanager@espavo.org', 'DKIM-Signature: v=1; d=espavo.org; s=x'))), false, 'old sender must no longer match');
+assert.strictEqual(sandbox.isNewsletter_(message(newsletterHeaders('Steve <steve@steverother.org>', 'DKIM-Signature: v=1; d=steverother.org; s=x'))), false, 'personal mail must not match');
+assert.strictEqual(sandbox.sanitizeSettings_({ sender: 'someone@example.org', gmailQuery: 'from:someone@example.org' }).sender, 'mailmanager@kjbm.steverother.org', 'saved settings must not override the sender');
+assert(sandbox.sanitizeSettings_({}).gmailQuery.startsWith('from:mailmanager@kjbm.steverother.org '));
+
+// Counters are removed; ordinary numbers stay.
+assert.strictEqual(sandbox.removeCounters_('Day 12 of 30\nWelcome to the teaching.'), 'Welcome to the teaching.');
+assert.strictEqual(sandbox.removeCounters_('Issue 4/12: Grief and renewal'), 'Grief and renewal');
+assert.strictEqual(sandbox.removeCounters_('#12\nThe seventh season begins.'), 'The seventh season begins.');
+assert.strictEqual(sandbox.removeCounters_('Day 1 is about breath.'), 'Day 1 is about breath.');
+assert.strictEqual(sandbox.removeCounters_('We meet at 9am on 12 May.'), 'We meet at 9am on 12 May.');
+
 console.log('All local helper tests passed.');

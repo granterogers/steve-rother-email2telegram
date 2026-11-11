@@ -3,15 +3,15 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.14';
+const APP_VERSION = '1.0.15';
 
 
 const CONFIG = Object.freeze({
-  sender: 'mailmanager@espavo.org',
+  sender: 'mailmanager@kjbm.steverother.org',
   testMessageId: '',
   processedLabel: 'Espavo/Telegram-Processed',
   errorLabel: 'Espavo/Telegram-Error',
-  gmailQuery: 'from:mailmanager@espavo.org newer_than:180d -in:spam -in:trash',
+  gmailQuery: 'from:mailmanager@kjbm.steverother.org newer_than:180d -in:spam -in:trash',
   model: 'gemini-3.6-flash',
   maxSourceChars: 30000,
   maxTelegramChars: 3800,
@@ -20,7 +20,7 @@ const CONFIG = Object.freeze({
   triggerEveryMinutes: 1440,
   maxRetries: 3,
   rewritePrompt: [
-    'Rewrite this Espavo newsletter as one warm, clear Telegram post for Steve Rother\'s community.',
+    'Rewrite this Espavo newsletter as one warm, clear Telegram post for Steve Rother\'s community. Never include counters or numbering from the email, such as "Day 12 of 30", "Issue 4", or "#12".',
     'Preserve the central teaching, factual dates, event details, speaker names, and any useful non-tracking original link.',
     'Preserve every useful event, registration, video, course, and source hyperlink supplied in the cleaned newsletter. Put the descriptive link text immediately before its complete URL; never invent or shorten a URL.',
     'Remove email boilerplate, tracking language, unsubscribe text, repeated navigation, sales clutter, and duplicate passages.',
@@ -558,15 +558,29 @@ function isNewsletter_(message) {
   const headerText = raw.split(/\r?\n\r?\n/, 1)[0];
   const from = String(message.getFrom() || '').toLowerCase();
   if (!new RegExp('(?:<|\\b)' + escapeRegex_(settings.sender) + '(?:>|\\b)', 'i').test(from)) return false;
+  const senderDomain = settings.sender.split('@')[1];
+  const orgDomain = senderDomain.split('.').slice(-2).join('.');
+  const dkimDomains = [senderDomain, orgDomain].filter((value, index, all) => all.indexOf(value) === index).map(escapeRegex_).join('|');
   const checks = [
     /^precedence:\s*bulk\s*$/im.test(headerText),
     /^list-unsubscribe:/im.test(headerText),
     /^feedback-id:.*mailerlite/im.test(headerText),
     /^message-id:.*@mlsend\.com>/im.test(headerText),
-    /dkim=pass[^\r\n]*header\.i=@espavo\.org/i.test(headerText) || /dkim-signature:[^\r\n]*\bd=espavo\.org\b/i.test(headerText),
+    new RegExp('dkim=pass[^\\r\\n]*header\\.i=@(?:' + dkimDomains + ')\\b', 'i').test(headerText) || new RegExp('dkim-signature:[^\\r\\n]*\\bd=(?:' + dkimDomains + ')\\b', 'i').test(headerText),
     /content-type:\s*multipart\/alternative/i.test(headerText)
   ];
   return checks.filter(Boolean).length >= 4;
+}
+
+// Removes numbering that only makes sense in the email, such as "Day 12 of 30", "Issue 4/12", or a lone "#12".
+function removeCounters_(text) {
+  return String(text || '')
+    .replace(/\b(?:day|week|month|issue|edition|episode|part|lesson|module|session|chapter|step)\s*#?\s*\d{1,4}\s*(?:of|\/)\s*\d{1,4}\b[:.\-\u2013\u2014]?/gi, ' ')
+    .replace(/^\s*#\s*\d{1,4}\s*[.:)\-\u2013\u2014]?\s*$/gm, '')
+    .replace(/^\s*\[?\d{1,4}\s*\/\s*\d{1,4}\]?\s*$/gm, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function extractNewsletter_(message) {
@@ -576,7 +590,7 @@ function extractNewsletter_(message) {
   const imageAware = html ? htmlToImageAwareText_(html, settings.maxNewsletterImages, settings.maxNewsletterLinks) : { text: '', images: [], links: [] };
   let text = html ? imageAware.text : cleanPlainText_(plain);
   if (text.length < 250 && plain) text = cleanPlainText_(plain);
-  text = applyCustomParsing_(text, settings);
+  text = removeCounters_(applyCustomParsing_(text, settings));
   if (!text || text.length < settings.minimumSourceChars) throw new Error('No useful newsletter content remained after the configured parsing rules.');
   const originalLength = text.length;
   if (text.length > settings.maxSourceChars) text = text.slice(0, settings.maxSourceChars);
@@ -1212,14 +1226,14 @@ function getSettings_() {
 
 function sanitizeSettings_(input) {
   const defaults = CONFIG;
-  const sender = String(input.sender || defaults.sender).trim().toLowerCase();
+  const sender = defaults.sender;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender)) throw new Error('Newsletter sender must be a valid email address.');
   const triggerMinutes = 1440;
   return {
     sender: sender,
     processedLabel: String(input.processedLabel || defaults.processedLabel).trim(),
     errorLabel: String(input.errorLabel || defaults.errorLabel).trim(),
-    gmailQuery: String(input.gmailQuery || ('from:' + sender + ' newer_than:180d -in:spam -in:trash')).trim(),
+    gmailQuery: 'from:' + sender + ' newer_than:180d -in:spam -in:trash',
     model: String(input.model || defaults.model).trim(),
     maxSourceChars: clamp_(Number(input.maxSourceChars), 2000, 50000, defaults.maxSourceChars),
     minimumSourceChars: clamp_(Number(input.minimumSourceChars), 100, 5000, 250),
