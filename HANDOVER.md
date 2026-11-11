@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.18**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.19**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -219,6 +219,7 @@ Every change bumps `APP_VERSION` and adds a line here.
 | 1.0.12 | Setup steps corrected: a non-admin bot can post and needs `/start@bot` to be seen. |
 | 1.0.13 | "Check what Telegram can see" read-only diagnostic. |
 | 1.0.14 | Version history added to the handover. |
+| 1.0.19 | Buttons whose label is an image keep the image's alt text as their label. Buttons to the same address with different labels both stay links. Read-only "Show the links found in the newest newsletter" diagnostic lists every link and why it was kept or dropped. |
 | 1.0.18 | Click-tracking links on the newsletter's own domain (`kjbm.steverother.org/c/...`) are hyperlinks with their button label only, so no raw tracking address appears. Links whose label is a URL are dropped. "View in Web Browser" is removed. |
 | 1.0.17 | Matching now requires only the exact sender address, at the owner's request. Header checks are diagnostic only. The sender match compares the full address, so look-alike addresses are rejected. |
 | 1.0.16 | Read-only "Why is my newsletter not found?" diagnostic in Connections. Matching is split into named checks so a mismatch shows which check failed. |

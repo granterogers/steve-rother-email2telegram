@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.18';
+const APP_VERSION = '1.0.19';
 
 
 const CONFIG = Object.freeze({
@@ -583,6 +583,22 @@ function senderAddressOf_(from) {
   return (angled ? angled[1] : String(from || '')).trim().toLowerCase();
 }
 
+// Read-only: lists every link in the newest matching newsletter and why it was kept or dropped.
+// Shows button labels and link hosts only, never the message body.
+function diagnoseLinkExtraction() {
+  const settings = getSettings_();
+  const threads = GmailApp.search('(' + settings.gmailQuery + ') in:inbox -in:trash -in:spam', 0, 10);
+  const message = threads.map(thread => thread.getMessages()[thread.getMessages().length - 1]).find(candidate => isNewsletter_(candidate));
+  if (!message) return 'No matching newsletter is in the Inbox.';
+  const html = String(message.getBody() || '');
+  const report = [];
+  htmlToImageAwareText_(html, settings.maxNewsletterImages, settings.maxNewsletterLinks, report);
+  const lines = ['Links (anchors) in the newest matching newsletter: ' + (html.match(/<a\b/gi) || []).length];
+  lines.push('Links kept as hyperlinks: ' + report.filter(item => item.reason === 'kept as a link').length + ' of ' + report.length + ' checked.');
+  report.forEach((item, index) => lines.push((index + 1) + '. "' + (item.label || '(no label)') + '" to ' + (item.host || 'unknown host') + ': ' + item.reason));
+  return lines.join('\n');
+}
+
 // Read-only: explains why a newsletter is or is not found, without showing any message body.
 function diagnoseNewsletterMatch() {
   const settings = getSettings_();
@@ -643,7 +659,7 @@ function extractNewsletter_(message) {
   };
 }
 
-function htmlToImageAwareText_(html, maxImages, maxLinks) {
+function htmlToImageAwareText_(html, maxImages, maxLinks, report) {
   const images = [];
   const links = [];
   const linkLimit = Number(maxLinks || CONFIG.maxNewsletterLinks || 30);
@@ -661,6 +677,11 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
     .replace(/<\/(?:em|i)>/gi, ' [[/I]] ')
     .replace(/<h[1-6]\b[^>]*>/gi, '\n[[B]] ')
     .replace(/<\/h[1-6]>/gi, ' [[/B]]\n')
+    .replace(/(<a\b[^>]*href=["']https?:\/\/[^"']+["'][^>]*>)([\s\S]*?)(<\/a>)/gi, function(match, open, inner, close) {
+      if (stripTags_(inner).replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, '').length > 0) return match;
+      const alt = (inner.match(/<img\b[^>]*\b(?:alt|title)=["']([^"']+)["']/i) || [])[1] || (open.match(/\b(?:title|aria-label)=["']([^"']+)["']/i) || [])[1] || '';
+      return alt.trim() ? open + ' ' + decodeHtmlEntities_(alt).trim() + ' ' + close : match;
+    })
     .replace(/<img\b[^>]*>/gi, function(tag) {
       if (images.length >= maxImages) return ' ';
       const candidate = newsletterImageFromTag_(tag);
@@ -679,12 +700,17 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
       const cleanLabel = labelText.replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, ' ').trim();
       const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter)? ?in (?:your |the )?(?:web )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
       const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
-      if (blockedLabel.test(cleanLabel)) return ' ';
-      if (links.length >= linkLimit || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
-      if (!decodedUrl || seenLinks[decodedUrl]) return preservedContent;
-      seenLinks[decodedUrl] = true;
+      const host = (decodedUrl.match(/^https?:\/\/([^/]+)/i) || [])[1] || '';
+      const note = reason => { if (report) report.push({ host: host, label: cleanLabel, reason: reason }); };
+      if (blockedLabel.test(cleanLabel)) { note('browser or unsubscribe boilerplate, removed'); return ' '; }
+      if (!isUsefulNewsletterLink_(decodedUrl, cleanLabel)) { note(cleanLabel ? 'label or address not treated as a link' : 'no visible label'); return preservedContent; }
+      if (links.length >= linkLimit) { note('link limit reached'); return preservedContent; }
+      const linkKey = decodedUrl + '|' + cleanLabel;
+      if (!decodedUrl || seenLinks[linkKey]) { note('same address and label as an earlier link'); return preservedContent; }
+      seenLinks[linkKey] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
       links.push({ marker: marker, url: decodedUrl, label: cleanLabel || decodedUrl });
+      note('kept as a link');
       const openStyle = (hasBold ? '[[B]] ' : '') + (hasItalic ? '[[I]] ' : '');
       const closeStyle = (hasItalic ? ' [[/I]]' : '') + (hasBold ? ' [[/B]]' : '');
       return ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + openStyle + (cleanLabel ? cleanLabel + ' ' : '') + marker + closeStyle + ' ';

@@ -304,4 +304,14 @@ assert.strictEqual(JSON.stringify(wrapped.links.map(link => link.label)), JSON.s
 assert(!/https?:\/\//.test(wrappedPost), 'no raw tracking address may appear in the post');
 assert(!/View in Web Browser/i.test(wrappedPost), 'browser boilerplate must be removed');
 
+// Buttons: image-only buttons keep their alt text as the label; buttons to the same address with different labels both stay links.
+const buttonHtml = '<a href="https://email.kjbm.steverother.org/c/' + 'D'.repeat(60) + '"><img src="https://cdn.example.org/btn.png" width="240" height="50" alt="Watch it here"></a>' +
+  '<p><a href="https://email.kjbm.steverother.org/c/' + 'E'.repeat(60) + '">Begin your healing</a></p>' +
+  '<p><a href="https://email.kjbm.steverother.org/c/' + 'E'.repeat(60) + '">Ask the Oracle here</a></p>';
+const buttonReport = [];
+const buttons = sandbox.htmlToImageAwareText_(buttonHtml, 8, 30, buttonReport);
+assert.strictEqual(JSON.stringify(buttons.links.map(link => link.label)), JSON.stringify(['Watch it here', 'Begin your healing', 'Ask the Oracle here']), 'every labelled button must become a link');
+assert.strictEqual(buttonReport.length, 3);
+assert(buttonReport.every(item => item.reason === 'kept as a link'));
+
 console.log('All local helper tests passed.');
