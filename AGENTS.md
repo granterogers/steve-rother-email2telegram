@@ -6,7 +6,7 @@ Read `README.md` and `HANDOVER.md` before changing this project.
 
 - Keep the solution on Google Apps Script and free-tier services unless the owner explicitly changes that decision.
 - Never commit API keys, bot tokens, numeric private chat IDs, Gmail bodies, stored dry-run output, or Script Properties.
-- Do not broaden newsletter matching. Preserve the strict sender and independent-header checks.
+- Newsletter matching is the exact sender address only (owner decision, version 1.0.17). Do not broaden it without the owner's approval.
 - Never mark Gmail processed before Telegram has confirmed every required message.
 - Preserve locks, bounded retry/backoff, publication journals, and duplicate protection.
 - Keep dry-run mode non-publishing and non-mutating.

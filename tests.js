@@ -288,4 +288,9 @@ assert.strictEqual(sandbox.removeCounters_('#12\nThe seventh season begins.'), '
 assert.strictEqual(sandbox.removeCounters_('Day 1 is about breath.'), 'Day 1 is about breath.');
 assert.strictEqual(sandbox.removeCounters_('We meet at 9am on 12 May.'), 'We meet at 9am on 12 May.');
 
+// Matching uses the exact sender address only.
+assert.strictEqual(sandbox.isNewsletter_(message({ from: 'mailmanager@kjbm.steverother.org', raw: 'From: mailmanager@kjbm.steverother.org\r\n\r\nbody' })), true, 'bare exact address must match without other headers');
+assert.strictEqual(sandbox.isNewsletter_(message({ from: 'x-mailmanager@kjbm.steverother.org', raw: 'From: x\r\n\r\nbody' })), false, 'look-alike address must not match');
+assert.strictEqual(sandbox.isNewsletter_(message({ from: 'SteveRother.org <mailmanager@kjbm.steverother.org.evil.example>', raw: 'From: x\r\n\r\nbody' })), false, 'longer domain must not match');
+
 console.log('All local helper tests passed.');

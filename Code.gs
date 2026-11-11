@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.16';
+const APP_VERSION = '1.0.17';
 
 
 const CONFIG = Object.freeze({
@@ -562,7 +562,7 @@ function newsletterChecks_(message) {
   const orgDomain = senderDomain.split('.').slice(-2).join('.');
   const dkimDomains = [senderDomain, orgDomain].filter((value, index, all) => all.indexOf(value) === index).map(escapeRegex_).join('|');
   return {
-    sender: new RegExp('(?:<|\\b)' + escapeRegex_(settings.sender) + '(?:>|\\b)', 'i').test(from),
+    sender: senderAddressOf_(from) === String(settings.sender).toLowerCase(),
     bulkPrecedence: /^precedence:\s*bulk\s*$/im.test(headerText),
     unsubscribeHeader: /^list-unsubscribe:/im.test(headerText),
     mailerLiteFeedback: /^feedback-id:.*mailerlite/im.test(headerText),
@@ -572,11 +572,15 @@ function newsletterChecks_(message) {
   };
 }
 
+// The exact sender address is the only requirement. The other checks are reported for diagnosis only.
 function isNewsletter_(message) {
-  const checks = newsletterChecks_(message);
-  if (!checks.sender) return false;
-  const { sender, ...signals } = checks;
-  return Object.keys(signals).filter(key => signals[key]).length >= 4;
+  return newsletterChecks_(message).sender;
+}
+
+// Returns the bare address from a From header, such as "Name <address>" or "address".
+function senderAddressOf_(from) {
+  const angled = String(from || '').match(/<([^>]+)>/);
+  return (angled ? angled[1] : String(from || '')).trim().toLowerCase();
 }
 
 // Read-only: explains why a newsletter is or is not found, without showing any message body.
