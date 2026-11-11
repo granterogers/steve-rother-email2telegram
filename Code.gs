@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.17';
+const APP_VERSION = '1.0.18';
 
 
 const CONFIG = Object.freeze({
@@ -677,9 +677,10 @@ function htmlToImageAwareText_(html, maxImages, maxLinks) {
       const hasBold = /\[\[B\]\]/.test(labelText) || /font-weight\s*:\s*(?:bold|[6-9]00)/i.test(tag);
       const hasItalic = /\[\[I\]\]/.test(labelText) || /font-style\s*:\s*italic/i.test(tag);
       const cleanLabel = labelText.replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, ' ').trim();
-      const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter) in (?:your )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
+      const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter)? ?in (?:your |the )?(?:web )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
       const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
-      if (links.length >= linkLimit || blockedLabel.test(cleanLabel) || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
+      if (blockedLabel.test(cleanLabel)) return ' ';
+      if (links.length >= linkLimit || !isUsefulNewsletterLink_(decodedUrl, cleanLabel)) return preservedContent;
       if (!decodedUrl || seenLinks[decodedUrl]) return preservedContent;
       seenLinks[decodedUrl] = true;
       const marker = '[[LINK_' + (links.length + 1) + ']]';
@@ -1200,13 +1201,17 @@ function requireProperty_(props, name) {
 }
 
 function stripTags_(value) { return String(value || '').replace(/<[^>]+>/g, ' '); }
-function isTrackingUrl_(value) { return /(?:(?:^|\/\/)(?:[^/]+\.)?(?:mlsend\.com|mailerlite\.com)\b|unsubscribe|mailto:)/i.test(String(value || '')); }
+function isTrackingUrl_(value) { return /(?:(?:^|\/\/)(?:[^/]+\.)?(?:mlsend\.com|mailerlite\.com)\b|unsubscribe|mailto:)/i.test(String(value || '')) || isClickWrapperUrl_(value); }
+// Click-tracking redirects, such as https://email.kjbm.steverother.org/c/<token>. Their label is kept as a hyperlink; the address is never shown.
+function isClickWrapperUrl_(value) { return /^https:\/\/(?:[^/]+\.)?kjbm\.steverother\.org\/c\//i.test(String(value || '').trim()); }
 function isUsefulNewsletterLink_(url, label) {
   const value = String(url || '').trim();
   const text = String(label || '').trim();
   if (!/^https:\/\//i.test(value)) return false;
-  const meaningfulLabel = text.length >= 4 && !/^(?:click here|read more|learn more|website|link)$/i.test(text);
-  if (isTrackingUrl_(value) && !(/(?:^|\.)mlsend\.com\//i.test(value) && meaningfulLabel)) return false;
+  const meaningfulLabel = text.length >= 4 && !/^(?:click here|read more|learn more|website|link)$/i.test(text) && !/^https?:\/\//i.test(text);
+  const buttonLabel = text.length >= 2 && !/^https?:\/\//i.test(text);
+  if (isClickWrapperUrl_(value) && buttonLabel) return !/^(?:unsubscribe|manage preferences|share|forward)$/i.test(text);
+  if (isTrackingUrl_(value) && !((/(?:^|\.)mlsend\.com\//i.test(value) || isClickWrapperUrl_(value)) && meaningfulLabel)) return false;
   if (/\b(?:facebook|instagram|youtube|twitter|linkedin|pinterest)\.com\b/i.test(value) && /^(?:facebook|instagram|youtube|x|twitter|linkedin|pinterest)?$/i.test(text)) return false;
   return !/^(?:unsubscribe|manage preferences|view in browser|share|forward)$/i.test(text);
 }

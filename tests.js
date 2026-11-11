@@ -293,4 +293,15 @@ assert.strictEqual(sandbox.isNewsletter_(message({ from: 'mailmanager@kjbm.steve
 assert.strictEqual(sandbox.isNewsletter_(message({ from: 'x-mailmanager@kjbm.steverother.org', raw: 'From: x\r\n\r\nbody' })), false, 'look-alike address must not match');
 assert.strictEqual(sandbox.isNewsletter_(message({ from: 'SteveRother.org <mailmanager@kjbm.steverother.org.evil.example>', raw: 'From: x\r\n\r\nbody' })), false, 'longer domain must not match');
 
+// Click-tracking wrappers on the newsletter's own domain: the label is a hyperlink, the address is never shown.
+const wrapperHtml = '<p><a href="https://email.kjbm.steverother.org/c/' + 'A'.repeat(60) + '">View in Web Browser</a></p>' +
+  '<p>Join the session.</p>' +
+  '<p><a href="https://email.kjbm.steverother.org/c/' + 'B'.repeat(60) + '">Book a Private Session</a></p>' +
+  '<p><a href="https://email.kjbm.steverother.org/c/' + 'C'.repeat(60) + '">https://email.kjbm.steverother.org/c/' + 'C'.repeat(60) + '</a></p>';
+const wrapped = sandbox.htmlToImageAwareText_(wrapperHtml, 8, 30);
+const wrappedPost = sandbox.ensureLinkMarkers_(sandbox.ensureImageMarkers_(wrapped.text, wrapped.images), wrapped.links);
+assert.strictEqual(JSON.stringify(wrapped.links.map(link => link.label)), JSON.stringify(['Book a Private Session']), 'only the real button label becomes a link');
+assert(!/https?:\/\//.test(wrappedPost), 'no raw tracking address may appear in the post');
+assert(!/View in Web Browser/i.test(wrappedPost), 'browser boilerplate must be removed');
+
 console.log('All local helper tests passed.');
