@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.15';
+const APP_VERSION = '1.0.16';
 
 
 const CONFIG = Object.freeze({
@@ -552,24 +552,48 @@ function processMessage_(message, options) {
   return result;
 }
 
-function isNewsletter_(message) {
+// Each named check is reported separately so a mismatch can be explained, not guessed.
+function newsletterChecks_(message) {
   const settings = getSettings_();
   const raw = message.getRawContent();
   const headerText = raw.split(/\r?\n\r?\n/, 1)[0];
   const from = String(message.getFrom() || '').toLowerCase();
-  if (!new RegExp('(?:<|\\b)' + escapeRegex_(settings.sender) + '(?:>|\\b)', 'i').test(from)) return false;
   const senderDomain = settings.sender.split('@')[1];
   const orgDomain = senderDomain.split('.').slice(-2).join('.');
   const dkimDomains = [senderDomain, orgDomain].filter((value, index, all) => all.indexOf(value) === index).map(escapeRegex_).join('|');
-  const checks = [
-    /^precedence:\s*bulk\s*$/im.test(headerText),
-    /^list-unsubscribe:/im.test(headerText),
-    /^feedback-id:.*mailerlite/im.test(headerText),
-    /^message-id:.*@mlsend\.com>/im.test(headerText),
-    new RegExp('dkim=pass[^\\r\\n]*header\\.i=@(?:' + dkimDomains + ')\\b', 'i').test(headerText) || new RegExp('dkim-signature:[^\\r\\n]*\\bd=(?:' + dkimDomains + ')\\b', 'i').test(headerText),
-    /content-type:\s*multipart\/alternative/i.test(headerText)
-  ];
-  return checks.filter(Boolean).length >= 4;
+  return {
+    sender: new RegExp('(?:<|\\b)' + escapeRegex_(settings.sender) + '(?:>|\\b)', 'i').test(from),
+    bulkPrecedence: /^precedence:\s*bulk\s*$/im.test(headerText),
+    unsubscribeHeader: /^list-unsubscribe:/im.test(headerText),
+    mailerLiteFeedback: /^feedback-id:.*mailerlite/im.test(headerText),
+    mailerLiteMessageId: /^message-id:.*@mlsend\.com>/im.test(headerText),
+    ownDomainDkim: new RegExp('dkim=pass[^\\r\\n]*header\\.i=@(?:' + dkimDomains + ')\\b', 'i').test(headerText) || new RegExp('dkim-signature:[^\\r\\n]*\\bd=(?:' + dkimDomains + ')\\b', 'i').test(headerText),
+    multipartAlternative: /content-type:\s*multipart\/alternative/i.test(headerText)
+  };
+}
+
+function isNewsletter_(message) {
+  const checks = newsletterChecks_(message);
+  if (!checks.sender) return false;
+  const { sender, ...signals } = checks;
+  return Object.keys(signals).filter(key => signals[key]).length >= 4;
+}
+
+// Read-only: explains why a newsletter is or is not found, without showing any message body.
+function diagnoseNewsletterMatch() {
+  const settings = getSettings_();
+  const query = '(' + settings.gmailQuery + ') in:inbox -in:trash -in:spam';
+  const threads = GmailApp.search(query, 0, 20);
+  const lines = ['Sender required: ' + settings.sender, 'Inbox conversations matching the sender: ' + threads.length];
+  const anyFromOwner = GmailApp.search('from:steverother.org in:inbox', 0, 20).length;
+  lines.push('Inbox conversations from any steverother.org address: ' + anyFromOwner);
+  threads.slice(0, 5).forEach((thread, index) => thread.getMessages().slice(0, 1).forEach(message => {
+    const checks = newsletterChecks_(message);
+    const labels = { sender: 'sender address', bulkPrecedence: 'bulk precedence', unsubscribeHeader: 'unsubscribe header', mailerLiteFeedback: 'MailerLite feedback header', mailerLiteMessageId: 'MailerLite message ID', ownDomainDkim: 'DKIM from steverother.org', multipartAlternative: 'HTML and text parts' };
+    const missing = Object.keys(labels).filter(key => !checks[key]).map(key => labels[key]);
+    lines.push('Conversation ' + (index + 1) + ': ' + (isNewsletter_(message) ? 'MATCHED' : 'not matched') + '. Missing: ' + (missing.length ? missing.join('; ') : 'nothing'));
+  }));
+  return lines.join('\n');
 }
 
 // Removes numbering that only makes sense in the email, such as "Day 12 of 30", "Issue 4/12", or a lone "#12".
