@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.19';
+const APP_VERSION = '1.0.20';
 
 
 const CONFIG = Object.freeze({
@@ -596,6 +596,13 @@ function diagnoseLinkExtraction() {
   const lines = ['Links (anchors) in the newest matching newsletter: ' + (html.match(/<a\b/gi) || []).length];
   lines.push('Links kept as hyperlinks: ' + report.filter(item => item.reason === 'kept as a link').length + ' of ' + report.length + ' checked.');
   report.forEach((item, index) => lines.push((index + 1) + '. "' + (item.label || '(no label)') + '" to ' + (item.host || 'unknown host') + ': ' + item.reason));
+  const skipped = (html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || []).filter(link => !/href\s*=\s*["']https?:\/\//i.test(link.match(/<a\b[^>]*>/i)[0]));
+  lines.push('Links whose address is not a plain http(s) link, so they were not checked: ' + skipped.length);
+  skipped.slice(0, 20).forEach((link, index) => {
+    const opening = link.match(/<a\b[^>]*>/i)[0].replace(/https?:\/\/([^\s"'>\/]+)[^\s"'>]*/gi, 'https://$1/...').slice(0, 200);
+    const text = link.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+    lines.push((index + 1) + '. ' + opening + ' text: "' + text + '"');
+  });
   return lines.join('\n');
 }
 
@@ -698,7 +705,7 @@ function htmlToImageAwareText_(html, maxImages, maxLinks, report) {
       const hasBold = /\[\[B\]\]/.test(labelText) || /font-weight\s*:\s*(?:bold|[6-9]00)/i.test(tag);
       const hasItalic = /\[\[I\]\]/.test(labelText) || /font-style\s*:\s*italic/i.test(tag);
       const cleanLabel = labelText.replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, ' ').trim();
-      const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter)? ?in (?:your |the )?(?:web )?browser|share|facebook|instagram|youtube|x|twitter|forward email)$/i;
+      const blockedLabel = /^(?:unsubscribe|manage preferences|view (?:this )?(?:email|newsletter)? ?in (?:your |the )?(?:web )?browser|share|facebook|instagram|youtube|tiktok|linkedin|pinterest|snapchat|threads|x|twitter|forward email)$/i;
       const preservedContent = ' ' + (embeddedImageMarkers ? embeddedImageMarkers + ' ' : '') + cleanLabel + ' ';
       const host = (decodedUrl.match(/^https?:\/\/([^/]+)/i) || [])[1] || '';
       const note = reason => { if (report) report.push({ host: host, label: cleanLabel, reason: reason }); };

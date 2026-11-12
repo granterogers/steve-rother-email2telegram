@@ -314,4 +314,8 @@ assert.strictEqual(JSON.stringify(buttons.links.map(link => link.label)), JSON.s
 assert.strictEqual(buttonReport.length, 3);
 assert(buttonReport.every(item => item.reason === 'kept as a link'));
 
+// Social footer icons are boilerplate, not newsletter content.
+const socialLinks = sandbox.htmlToImageAwareText_('<a href="https://email.kjbm.steverother.org/c/' + 'G'.repeat(60) + '">TikTok</a> <a href="https://email.kjbm.steverother.org/c/' + 'H'.repeat(60) + '">LinkedIn</a><p>Real text.</p>', 8, 30);
+assert.strictEqual(socialLinks.links.length, 0, 'social footer links must not become links');
+
 console.log('All local helper tests passed.');
