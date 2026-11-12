@@ -328,4 +328,11 @@ const variants = [
 const variantLinks = sandbox.htmlToImageAwareText_(variants.join(' '), 8, 30);
 assert.strictEqual(JSON.stringify(variantLinks.links.map(link => link.label)), JSON.stringify(['Variant spaced', 'Variant single', 'Variant upper', 'Variant bare']), 'all link syntax variants must become links');
 
+// Outlook reveal comments wrap real content in newsletters from this platform; the content must survive.
+const revealHtml = '<!--[if !mso]>--><table><tr><td><a href="https://email.kjbm.steverother.org/c/' + 'N'.repeat(60) + '">Watch it here</a></td></tr></table><!--<![endif]-->' + '<p>Real paragraph after the reveal.</p>';
+const revealed = sandbox.htmlToImageAwareText_(revealHtml, 8, 30, []);
+assert(revealed.text.includes('Real paragraph after the reveal.'), 'content inside reveal comments must not be removed');
+assert.strictEqual(JSON.stringify(revealed.links.map(link => link.label)), JSON.stringify(['Watch it here']));
+assert.strictEqual(sandbox.removeBoilerplate_('| Sent by ESPAVO\n5351 N Lisa Ln • Las Vegas, NV • 89149\nKept line.'), 'Kept line.', 'footer address lines must be removed');
+
 console.log('All local helper tests passed.');

@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.21';
+const APP_VERSION = '1.0.22';
 
 
 const CONFIG = Object.freeze({
@@ -673,7 +673,10 @@ function htmlToImageAwareText_(html, maxImages, maxLinks, report) {
   const seen = {};
   const seenLinks = {};
   let s = String(html || '');
-  s = s.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, ' ')
+  // Outlook 'reveal' comments (<!--[if !mso]><!--> ... <!--<![endif]-->) wrap real content, so only their markers are removed.
+  s = s.replace(/<!--\[if[^\]]*\]>\s*(?:<!--)?\s*-->/gi, ' ')
+    .replace(/<!--\s*<!\[endif\]\s*-->/gi, ' ')
+    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -798,7 +801,7 @@ function cleanPlainText_(plain) {
 
 function removeBoilerplate_(text) {
   const lines = String(text || '').replace(/\r/g, '').split('\n').map(x => x.replace(/\s+/g, ' ').trim());
-  const blocked = /^(view in browser|unsubscribe|not interested anymore|share to (facebook|x)|forward email|you received this email because|you're receiving this newsletter because|espavo\s*$|\d{3,5}\s+farm rd\b|nv\s+\d{5}\b)/i;
+  const blocked = /^[\s|•·-]*(view in browser|unsubscribe|not interested anymore|share to (facebook|x)|forward email|you received this email because|you're receiving this newsletter because|espavo\s*$|\d{3,5}\s+farm rd\b|nv\s+\d{5}\b|sent by espavo|\d{3,5}\s+[nsew]{1,2}\s+[\w ]+\s+(?:ln|ave|st|rd|dr|blvd|way)\b|las vegas,?\s+nv)/i;
   const out = [];
   lines.forEach(line => {
     if (!line || blocked.test(line) || (isTrackingUrl_(line) && /^https?:\/\/\S+$/i.test(line))) return;
