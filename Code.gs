@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.20';
+const APP_VERSION = '1.0.21';
 
 
 const CONFIG = Object.freeze({
@@ -684,6 +684,12 @@ function htmlToImageAwareText_(html, maxImages, maxLinks, report) {
     .replace(/<\/(?:em|i)>/gi, ' [[/I]] ')
     .replace(/<h[1-6]\b[^>]*>/gi, '\n[[B]] ')
     .replace(/<\/h[1-6]>/gi, ' [[/B]]\n')
+    .replace(/<a\b[^>]*>/gi, function(tag) {
+      // Canonicalise href syntax: spaces around =, single quotes and unquoted values.
+      return tag.replace(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i, function(_, dq, sq, bare) {
+        return 'href="' + (dq !== undefined ? dq : sq !== undefined ? sq : bare) + '"';
+      });
+    })
     .replace(/(<a\b[^>]*href=["']https?:\/\/[^"']+["'][^>]*>)([\s\S]*?)(<\/a>)/gi, function(match, open, inner, close) {
       if (stripTags_(inner).replace(/\[\[\/?(?:B|I)\]\]/g, '').replace(/\s+/g, '').length > 0) return match;
       const alt = (inner.match(/<img\b[^>]*\b(?:alt|title)=["']([^"']+)["']/i) || [])[1] || (open.match(/\b(?:title|aria-label)=["']([^"']+)["']/i) || [])[1] || '';

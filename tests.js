@@ -318,4 +318,14 @@ assert(buttonReport.every(item => item.reason === 'kept as a link'));
 const socialLinks = sandbox.htmlToImageAwareText_('<a href="https://email.kjbm.steverother.org/c/' + 'G'.repeat(60) + '">TikTok</a> <a href="https://email.kjbm.steverother.org/c/' + 'H'.repeat(60) + '">LinkedIn</a><p>Real text.</p>', 8, 30);
 assert.strictEqual(socialLinks.links.length, 0, 'social footer links must not become links');
 
+// Link syntax variants from real email HTML must all become links.
+const variants = [
+  '<a href = "https://email.kjbm.steverother.org/c/' + 'J'.repeat(60) + '">Variant spaced</a>',
+  "<a href='https://email.kjbm.steverother.org/c/" + 'K'.repeat(60) + "'>Variant single</a>",
+  '<a class="btn" style="color:#fff" HREF="https://email.kjbm.steverother.org/c/' + 'L'.repeat(60) + '">Variant upper</a>',
+  '<a href=https://email.kjbm.steverother.org/c/' + 'M'.repeat(60) + '>Variant bare</a>'
+];
+const variantLinks = sandbox.htmlToImageAwareText_(variants.join(' '), 8, 30);
+assert.strictEqual(JSON.stringify(variantLinks.links.map(link => link.label)), JSON.stringify(['Variant spaced', 'Variant single', 'Variant upper', 'Variant bare']), 'all link syntax variants must become links');
+
 console.log('All local helper tests passed.');
