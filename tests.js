@@ -335,4 +335,13 @@ assert(revealed.text.includes('Real paragraph after the reveal.'), 'content insi
 assert.strictEqual(JSON.stringify(revealed.links.map(link => link.label)), JSON.stringify(['Watch it here']));
 assert.strictEqual(sandbox.removeBoilerplate_('| Sent by ESPAVO\n5351 N Lisa Ln • Las Vegas, NV • 89149\nKept line.'), 'Kept line.', 'footer address lines must be removed');
 
+// Failures explain the step, the HTTP meaning, the attempts, and never show keys or tokens.
+const serviceMessage = sandbox.describeHttpFailure_('Gemini', 503, 4, JSON.stringify({ error: { message: 'The model is overloaded. Try key=SECRETKEY123 later' } }));
+assert(serviceMessage.includes('HTTP 503') && serviceMessage.includes('temporarily overloaded') && serviceMessage.includes('tried 4 times'), serviceMessage);
+assert(!serviceMessage.includes('SECRETKEY123') && serviceMessage.includes('key=[redacted]'), 'keys must be redacted');
+const tokenMessage = sandbox.describeHttpFailure_('Telegram', 401, 1, JSON.stringify({ description: 'Unauthorized bot123456:ABCdef_secret' }));
+assert(!tokenMessage.includes('ABCdef_secret') && tokenMessage.includes('bot[redacted]'), 'bot tokens must be redacted');
+const staged = sandbox.stageError_('Rewriting with Gemini', new Error('Gemini request failed (HTTP 503).'));
+assert(staged.message.startsWith('Rewriting with Gemini failed.') && staged.message.includes('Gmail was not changed'), staged.message);
+
 console.log('All local helper tests passed.');

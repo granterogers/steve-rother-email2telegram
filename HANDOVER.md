@@ -51,7 +51,7 @@ The original-email pane is a sandboxed rendering of the actual Gmail HTML (`sani
 
 ## Application version
 
-`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.22**. Apps Script's own deployment number (for example Version 29) is separate.
+`APP_VERSION` in `Code.gs` is the application version (semantic `MAJOR.MINOR.PATCH`). It is shown beside the dashboard title and checked by `tests.js`. Increase it with every change: patch for fixes and small edits, minor for new features, major for breaking changes. The current version is **1.0.23**. Apps Script's own deployment number (for example Version 29) is separate.
 
 ## Resources
 
@@ -219,6 +219,7 @@ Every change bumps `APP_VERSION` and adds a line here.
 | 1.0.12 | Setup steps corrected: a non-admin bot can post and needs `/start@bot` to be seen. |
 | 1.0.13 | "Check what Telegram can see" read-only diagnostic. |
 | 1.0.14 | Version history added to the handover. |
+| 1.0.23 | Failures now say which step failed, what the HTTP code means, how many attempts were made, the service's own message with keys and tokens removed, and that Gmail was not changed and nothing was sent to Telegram. |
 | 1.0.22 | Fixed a bug that deleted the whole body of newsletters wrapped in Outlook reveal comments (`<!--[if !mso]>-->` ... `<!--<![endif]-->`). All button links in the sample newsletter are now kept. The postal footer lines are removed as boilerplate. |
 | 1.0.21 | Link tags are normalised before extraction, so spaces around =, single quotes, uppercase and unquoted href values all become links. |
 | 1.0.20 | TikTok and LinkedIn footer links are treated as boilerplate. "Show the links found in the newest newsletter" now also lists link tags whose address is not a plain http(s) link, with the address reduced to its host. |

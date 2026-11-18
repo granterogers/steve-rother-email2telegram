@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.22';
+const APP_VERSION = '1.0.23';
 
 
 const CONFIG = Object.freeze({
@@ -524,8 +524,18 @@ function processMessage_(message, options) {
     return { status: 'duplicate_prevented', messageId: messageId };
   }
 
-  const extracted = extractNewsletter_(message);
-  const proposedPost = rewriteWithGemini_(extracted);
+  let extracted;
+  try {
+    extracted = extractNewsletter_(message);
+  } catch (error) {
+    throw stageError_('Reading and cleaning the email', error);
+  }
+  let proposedPost;
+  try {
+    proposedPost = rewriteWithGemini_(extracted);
+  } catch (error) {
+    throw stageError_('Rewriting with Gemini', error);
+  }
   const result = {
     status: options.testMode ? 'test_complete' : 'ready_to_publish',
     messageId: messageId,
@@ -968,7 +978,7 @@ function validateGemini_() {
   const key = requireProperty_(PropertiesService.getScriptProperties(), PROP.geminiKey);
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(settings.model) + '?key=' + encodeURIComponent(key);
   const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (response.getResponseCode() !== 200) throw new Error('Gemini validation failed with HTTP ' + response.getResponseCode() + '.');
+  if (response.getResponseCode() !== 200) throw new Error(describeHttpFailure_('Gemini', response.getResponseCode(), 1, response.getContentText()));
   const data = JSON.parse(response.getContentText());
   return { name: data.name, displayName: data.displayName };
 }
@@ -1027,7 +1037,7 @@ function telegramTrySendRich_(post, images, links, chatIdOverride) {
   const data = parseJson_(response.getContentText()) || {};
   if (code >= 200 && code < 300 && data.ok && data.result && data.result.message_id) return data.result;
   if ((code === 400 || code === 404) && /(?:method|rich|unsupported|can't parse|failed to get http url content|not found)/i.test(String(data.description || ''))) return null;
-  throw new Error('Telegram rich-message request failed with HTTP ' + code + ': ' + String(data.description || 'unknown error'));
+  throw new Error(describeHttpFailure_('Telegram rich message', code, 1, response.getContentText()));
 }
 
 function buildTelegramRichHtml_(post, images, links) {
@@ -1186,11 +1196,39 @@ function fetchWithRetry_(url, options, serviceName) {
     const code = response.getResponseCode();
     if (code >= 200 && code < 300) return response;
     if (attempt === settings.maxRetries || ![408, 429, 500, 502, 503, 504].includes(code)) {
-      throw new Error(serviceName + ' request failed with HTTP ' + code + '.');
+      throw new Error(describeHttpFailure_(serviceName, code, attempt, response.getContentText()));
     }
     Utilities.sleep(Math.pow(2, attempt - 1) * 1000 + Math.floor(Math.random() * 300));
   }
   return response;
+}
+
+// Explains an HTTP failure in plain words, with the service's own message and secrets removed.
+function describeHttpFailure_(serviceName, code, attempts, body) {
+  const meanings = {
+    400: 'the request was rejected as invalid. Check the model name and settings.',
+    401: 'access was refused. Check that the API key or bot token is valid.',
+    403: 'access was refused. Check that the API key is valid and the service is enabled for it.',
+    404: 'not found. Check the model name and the bot or chat settings.',
+    408: 'the request timed out.',
+    429: 'too many requests or the usage quota is used up. Wait, then try again later.',
+    500: 'the service had an internal error.',
+    502: 'the service is temporarily unavailable.',
+    503: 'the service is temporarily overloaded or unavailable.',
+    504: 'the service timed out while answering.'
+  };
+  const parsed = parseJson_(body) || {};
+  const detail = String((parsed.error && parsed.error.message) || parsed.description || '')
+    .replace(/key=[^&\s"']+/gi, 'key=[redacted]')
+    .replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot[redacted]')
+    .slice(0, 300);
+  const tries = attempts > 1 ? ' The app tried ' + attempts + ' times.' : '';
+  return serviceName + ' request failed (HTTP ' + code + '): ' + (meanings[code] || 'the service returned an unexpected response.') + tries + (detail ? ' Message from ' + serviceName + ': "' + detail + '"' : '');
+}
+
+// Adds the step that failed, and states what was and was not changed.
+function stageError_(stage, error) {
+  return new Error(stage + ' failed. ' + (error && error.message ? error.message : String(error)) + ' Gmail was not changed and nothing was sent to Telegram.');
 }
 
 function splitTelegram_(text, limit) {
