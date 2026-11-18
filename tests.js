@@ -337,7 +337,9 @@ assert.strictEqual(sandbox.removeBoilerplate_('| Sent by ESPAVO\n5351 N Lisa Ln 
 
 // Failures explain the step, the HTTP meaning, the attempts, and never show keys or tokens.
 const serviceMessage = sandbox.describeHttpFailure_('Gemini', 503, 4, JSON.stringify({ error: { message: 'The model is overloaded. Try key=SECRETKEY123 later' } }));
-assert(serviceMessage.includes('HTTP 503') && serviceMessage.includes('temporarily overloaded') && serviceMessage.includes('tried 4 times'), serviceMessage);
+assert(serviceMessage.includes('HTTP 503') && serviceMessage.includes('overloaded or unavailable') && serviceMessage.includes('tried 4 times'), serviceMessage);
+assert(serviceMessage.includes('not your account'), 'a 503 must say it is not the account usage limit');
+assert(sandbox.describeHttpFailure_('Gemini', 429, 1, '').includes('this account has hit its usage limit'), 'a 429 is the account limit');
 assert(!serviceMessage.includes('SECRETKEY123') && serviceMessage.includes('key=[redacted]'), 'keys must be redacted');
 const tokenMessage = sandbox.describeHttpFailure_('Telegram', 401, 1, JSON.stringify({ description: 'Unauthorized bot123456:ABCdef_secret' }));
 assert(!tokenMessage.includes('ABCdef_secret') && tokenMessage.includes('bot[redacted]'), 'bot tokens must be redacted');

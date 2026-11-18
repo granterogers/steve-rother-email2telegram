@@ -3,7 +3,7 @@
  * Secrets belong in Apps Script Project Settings > Script properties.
  */
 // Bump with every change; shown in the dashboard header and checked by tests.js.
-const APP_VERSION = '1.0.23';
+const APP_VERSION = '1.0.24';
 
 
 const CONFIG = Object.freeze({
@@ -1211,11 +1211,11 @@ function describeHttpFailure_(serviceName, code, attempts, body) {
     403: 'access was refused. Check that the API key is valid and the service is enabled for it.',
     404: 'not found. Check the model name and the bot or chat settings.',
     408: 'the request timed out.',
-    429: 'too many requests or the usage quota is used up. Wait, then try again later.',
-    500: 'the service had an internal error.',
-    502: 'the service is temporarily unavailable.',
-    503: 'the service is temporarily overloaded or unavailable.',
-    504: 'the service timed out while answering.'
+    429: 'this account has hit its usage limit or request rate for this service. Wait, then try again later.',
+    500: 'the service had an internal error on Google\'s side. This is not caused by your account.',
+    502: 'the service is temporarily unavailable on Google\'s side. This is not caused by your account.',
+    503: 'the service is overloaded or unavailable for everyone at the moment. This is not your account\'s usage limit.',
+    504: 'the service timed out on Google\'s side. This is not caused by your account.'
   };
   const parsed = parseJson_(body) || {};
   const detail = String((parsed.error && parsed.error.message) || parsed.description || '')
